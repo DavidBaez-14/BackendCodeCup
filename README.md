@@ -49,6 +49,26 @@ El diseño completo está en la documentación del workspace, fuera de este repo
 3. **Authorize.** Copia el valor de `access_token` de la respuesta, pulsa **Authorize** (arriba), pégalo y confirma. El token dura 1 hora.
 4. **Probar.** `GET /api/auth/me` responde 404 hasta que hagas `POST /api/auth/registro`; después responde 200 con tus roles.
 
+## Datos de prueba (seed)
+
+Crea en Supabase #1 los usuarios y datos para probar la web de punta a punta (spec 0019).
+
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=seed     # Windows: .\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=seed"
+```
+
+- **Qué crea:**
+  - 30 usuarios **ya confirmados** en Supabase Auth, con correos `@prueba.local`: `admin01`; `arbitro01` y `arbitro02`; `delegado01` a `delegado04`; y `jugador01` a `jugador23`;
+  - en CodeCup, su persona, su cuenta y sus roles. Todos tienen JUGADOR;
+  - **"Copa Prueba 2026"** (`PUBLICADO`, sin partidos, para aprobar inscripciones y generar el fixture desde la web): Halcones FC y Tiburones FC aprobados, Cóndores FC y Pumas FC en `PENDIENTE_PAGO`;
+  - **"Liga Relámpago (prueba)"** (`EN_CURSO`): Halcones FC contra Tiburones FC, un partido programado para el árbitro;
+  - planteles: cada delegado con su equipo; `jugador14` a `jugador23` quedan libres para pedir unirse. `jugador22` y `jugador23` no tienen perfil deportivo, para probar el modal de bienvenida.
+- **Contraseña:** una sola para todos, en `SEED_PASSWORD` del `.env`. Nunca va en el código.
+- **Documentos ficticios:** empiezan por `900000`: admin `9000000001`, árbitros `90000001xx`, delegados `90000002xx` y jugadores `90000003xx`.
+- **No envía correos:** usa la Admin API con `email_confirm: true`, nunca signUp, invite ni recover, para no gastar el cupo de Brevo. La app en ejecución nunca llama a la Admin API: solo el perfil `seed`.
+- **Idempotente:** se puede correr varias veces. Busca cada cosa por su llave natural y solo crea lo que falta. Si el usuario ya existe en Supabase, lo reutiliza y le vuelve a poner la `SEED_PASSWORD`. No pisa lo que cambiaste al probar (aprobaciones, bloqueos).
+- **Termina solo:** levanta en un puerto libre aleatorio, siembra y se cierra. Puede correr con el backend levantado en `:8082`.
+
 ## Tests
 
 ```bash
