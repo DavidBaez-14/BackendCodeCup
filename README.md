@@ -34,29 +34,20 @@ El diseño completo está en la documentación del workspace, fuera de este repo
 
 1. Copia `.env.example` como `.env` y completa estos valores desde los paneles. **`.env` nunca se sube.**
    - `DB_PASSWORD`: Supabase #1 → Connect → Session pooler.
+   - `SUPABASE_PUBLISHABLE_KEY`: Project Settings → API Keys → Publishable key (`sb_publishable_…`). Es pública; prellena el token de prueba de Swagger.
    - `SUPABASE_SECRET_KEY`: Project Settings → API Keys → Secret key (`sb_secret_…`). Solo hace falta para los comprobantes.
    - `BOOTSTRAP_ADMIN_EMAIL`: tu correo.
-2. Arranca `CodeCupApplication` desde el Spring Boot Dashboard de VS Code (puerto `8082`).
-   - **La primera vez, Flyway crea los 4 schemas y aplica `db/migration` en Supabase #1.** Después, Hibernate solo valida (`ddl-auto=validate`).
-3. Swagger está en `http://localhost:8082/swagger-ui/index.html`. Pega el access token en "Authorize".
+2. Arranca la configuración `Spring Boot-CodeCupApplication<codecup>` desde el Spring Boot Dashboard de VS Code (puerto `8082`). Corre desde esta carpeta y carga este `.env`.
+   - **La primera vez, Flyway crea los schemas y aplica `db/migration` en Supabase #1.** Después, Hibernate solo valida (`ddl-auto=validate`).
+3. Abre Swagger en `http://localhost:8082/swagger-ui/index.html`.
 
-### Obtener un access token sin la web
+### Probar en Swagger sin la web
 
-Usa la **publishable key** (`sb_publishable_…`), que es pública:
-
-```bash
-# 1. Crear el usuario. Supabase envía el correo de confirmación por Brevo.
-curl -X POST "https://jcuzocrgyomnuagvnwra.supabase.co/auth/v1/signup" \
-  -H "apikey: <PUBLISHABLE_KEY>" -H "Content-Type: application/json" \
-  -d '{"email":"tu@correo.com","password":"una-contraseña-larga"}'
-
-# 2. Después de confirmar el correo: pedir el token (dura 1 hora).
-curl -X POST "https://jcuzocrgyomnuagvnwra.supabase.co/auth/v1/token?grant_type=password" \
-  -H "apikey: <PUBLISHABLE_KEY>" -H "Content-Type: application/json" \
-  -d '{"email":"tu@correo.com","password":"una-contraseña-larga"}'
-```
-
-El campo `access_token` de la respuesta es el que va en `Authorization: Bearer …`.
+1. **Usuario de prueba.** En Supabase, Authentication → Users → Add user → Create new user, marcando **Auto Confirm User**.
+2. **Token.** En la primera sección de Swagger, **Token de prueba (Supabase)**, abre `POST /auth/v1/token` y pulsa Try it out. Escribe correo y contraseña y pulsa Execute.
+   - Esa petición va del navegador directo a Supabase; el backend no participa.
+3. **Authorize.** Copia el valor de `access_token` de la respuesta, pulsa **Authorize** (arriba), pégalo y confirma. El token dura 1 hora.
+4. **Probar.** `GET /api/auth/me` responde 404 hasta que hagas `POST /api/auth/registro`; después responde 200 con tus roles.
 
 ## Tests
 

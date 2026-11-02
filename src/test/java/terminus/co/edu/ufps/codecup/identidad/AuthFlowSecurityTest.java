@@ -3,6 +3,7 @@ package terminus.co.edu.ufps.codecup.identidad;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -35,6 +36,18 @@ class AuthFlowSecurityTest extends AuthTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.paths['/api/auth/me']").exists())
                 .andExpect(jsonPath("$.paths['/api/admin/invitaciones']").exists());
+    }
+
+    /** Criterio 20: el token de prueba se pide desde Swagger, directo a Supabase y sin Bearer. */
+    @Test
+    void swaggerTraeElTokenDePruebaDeSupabase() throws Exception {
+        mvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tags[0].name").value("Token de prueba (Supabase)"))
+                .andExpect(jsonPath("$.paths['/auth/v1/token'].servers[0].url").value("http://localhost:0"))
+                .andExpect(jsonPath("$.paths['/auth/v1/token'].post.security", hasSize(0)))
+                .andExpect(jsonPath("$.paths['/auth/v1/token'].post.parameters[?(@.name == 'apikey')].schema.default",
+                        hasItem("sb_publishable_test")));
     }
 
     @Test
