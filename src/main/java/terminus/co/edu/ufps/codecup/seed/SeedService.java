@@ -246,13 +246,22 @@ public final class SeedService {
         return miembros.size();
     }
 
-    /** Un partido PROGRAMADO entre los dos equipos de la liga, si todavía no existe. */
+    /**
+     * Garantiza un partido PROGRAMADO entre los dos equipos de la liga. Si el árbitro ya cerró
+     * el anterior, crea el de la jornada siguiente; si hay uno programado, no hace nada.
+     */
     private void asegurarPartido(Torneo liga, EquipoTorneo local, EquipoTorneo visitante) {
-        boolean existe = repos.partidos().findByTorneoId(liga.getId()).stream()
-                .anyMatch(p -> p.getEquipoLocalTorneo() != null && p.getEquipoVisitanteTorneo() != null
+        List<Partido> entreEllos = repos.partidos().findByTorneoId(liga.getId()).stream()
+                .filter(p -> p.getEquipoLocalTorneo() != null && p.getEquipoVisitanteTorneo() != null
                         && local.getId().equals(p.getEquipoLocalTorneo().getId())
-                        && visitante.getId().equals(p.getEquipoVisitanteTorneo().getId()));
-        if (existe) return;
+                        && visitante.getId().equals(p.getEquipoVisitanteTorneo().getId()))
+                .toList();
+        if (entreEllos.stream().anyMatch(p -> p.getEstado() == EstadoPartido.PROGRAMADO)) return;
+        int jornada = entreEllos.stream()
+                .map(Partido::getJornada)
+                .filter(j -> j != null)
+                .max(Integer::compare)
+                .orElse(0) + 1;
         repos.partidos().save(Partido.builder()
                 .torneo(liga)
                 .equipoLocalTorneo(local)
@@ -260,7 +269,7 @@ public final class SeedService {
                 .fecha(LocalDate.now().plusDays(1).atTime(LocalTime.of(16, 0)))
                 .estado(EstadoPartido.PROGRAMADO)
                 .fase(FaseTorneo.GRUPOS)
-                .jornada(1)
+                .jornada(jornada)
                 .build());
     }
 }

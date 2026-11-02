@@ -86,8 +86,8 @@ class SeedServiceTest {
         Torneo liga = torneo(DatosDePrueba.TORNEO_ARBITRO);
         assertThat(liga.getEstado()).isEqualTo(EstadoTorneo.EN_CURSO);
         assertThat(partidos.findByTorneoId(liga.getId()))
-                .singleElement()
-                .satisfies(p -> assertThat(p.getEstado()).isEqualTo(EstadoPartido.PROGRAMADO));
+                .filteredOn(p -> p.getEstado() == EstadoPartido.PROGRAMADO)
+                .hasSize(1);
 
         // Halcones FC: delegado01 y jugador01 a jugador05.
         var halcones = inscripciones.findByTorneoIdAndDelegadoCedula(copa.getId(), "9000000201").orElseThrow();
@@ -120,6 +120,24 @@ class SeedServiceTest {
         assertThat(partidos.count()).isEqualTo(partidosAntes);
         // La Admin API se consulta en cada corrida; el cliente real reutiliza el usuario si ya existe.
         assertThat(llamadas.get("admin01@prueba.local")).isEqualTo(2);
+    }
+
+    @Test
+    void siElArbitroCerroElPartido_siembraOtroProgramado() {
+        seed("clave-de-prueba").sembrar();
+        Torneo liga = torneo(DatosDePrueba.TORNEO_ARBITRO);
+        partidos.findByTorneoId(liga.getId()).forEach(p -> {
+            p.setEstado(EstadoPartido.FINALIZADO);
+            partidos.save(p);
+        });
+
+        seed("clave-de-prueba").sembrar();
+
+        var deLaLiga = partidos.findByTorneoId(liga.getId());
+        assertThat(deLaLiga).filteredOn(p -> p.getEstado() == EstadoPartido.PROGRAMADO).hasSize(1);
+        assertThat(deLaLiga).filteredOn(p -> p.getEstado() == EstadoPartido.PROGRAMADO)
+                .singleElement()
+                .satisfies(p -> assertThat(p.getJornada()).isGreaterThan(1));
     }
 
     @Test
