@@ -1,0 +1,23 @@
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# Secretos locales: solo se versiona la plantilla
+.env
+.env.*
+!.env.example
+
+### IDEs ###
+.idea/
+*.iml
+*.iws
+*.ipr
+.classpath
+.project
+.settings/
+.factorypath
+.apt_generated/
+.sts4-cache/
+.vscode/
+
+*.log
+HELP.md

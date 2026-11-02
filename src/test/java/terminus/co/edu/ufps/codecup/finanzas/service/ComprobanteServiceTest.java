@@ -1,0 +1,188 @@
+package terminus.co.edu.ufps.codecup.finanzas.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import terminus.co.edu.ufps.codecup.competicion.model.EquipoTorneo;
+import terminus.co.edu.ufps.codecup.competicion.model.EstadoInscripcion;
+import terminus.co.edu.ufps.codecup.competicion.repository.EquipoTorneoRepository;
+import terminus.co.edu.ufps.codecup.finanzas.dto.SubirComprobanteRequest;
+import terminus.co.edu.ufps.codecup.finanzas.model.Comprobante;
+import terminus.co.edu.ufps.codecup.finanzas.model.EstadoComprobante;
+import terminus.co.edu.ufps.codecup.finanzas.model.EstadoMulta;
+import terminus.co.edu.ufps.codecup.finanzas.model.Multa;
+import terminus.co.edu.ufps.codecup.finanzas.model.TipoComprobante;
+import terminus.co.edu.ufps.codecup.finanzas.repository.ComprobanteRepository;
+import terminus.co.edu.ufps.codecup.finanzas.repository.MultaRepository;
+
+/**
+ * Spec 0014: upsert al reemplazar comprobante (sin duplicar filas), solo mientras la inscripcion
+ * siga PENDIENTE_PAGO.
+ * Spec 0003 (M3): aprobar sin efecto silencioso y MULTA cierra el circulo.
+ */
+@ExtendWith(MockitoExtension.class)
+class ComprobanteServiceTest {
+
+    @Mock ComprobanteRepository comprobanteRepo;
+    @Mock EquipoTorneoRepository equipoTorneoRepo;
+    @Mock MultaRepository multaRepo;
+    @InjectMocks ComprobanteService service;
+
+    private static final UUID REF = UUID.randomUUID();
+
+    private SubirComprobanteRequest req(String url) {
+        var r = new SubirComprobanteRequest();
+        r.setTipo("INSCRIPCION");
+        r.setReferenciaId(REF);
+        r.setUrlArchivo(url);
+        return r;
+    }
+
+    private EquipoTorneo inscripcion(String delegado, EstadoInscripcion estado) {
+        var et = new EquipoTorneo();
+        et.setDelegadoCedula(delegado);
+        et.setEstadoInscripcion(estado);
+        return et;
+    }
+
+    @Test
+    void subir_segundaVez_reemplazaMismoComprobante_noCreaOtro() {
+        when(equipoTorneoRepo.findById(REF)).thenReturn(
+                Optional.of(inscripcion("delegado-1", EstadoInscripcion.PENDIENTE_PAGO)));
+        var existente = Comprobante.builder()
+                .id(UUID.randomUUID())
+                .tipo(TipoComprobante.INSCRIPCION)
+                .referenciaId(REF)
+                .urlArchivo("vieja.jpg")
+                .cedulaUploader("delegado-1")
+                .estado(EstadoComprobante.RECHAZADO)
+                .motivoRechazo("borrosa")
+                .build();
+        when(comprobanteRepo.findByReferenciaId(REF)).thenReturn(List.of(existente));
+
+        service.subir(req("nueva.jpg"), "delegado-1");
+
+        var captor = ArgumentCaptor.forClass(Comprobante.class);
+        verify(comprobanteRepo).save(captor.capture());
+        var c = captor.getValue();
+        assertThat(c.getId()).isEqualTo(existente.getId());   // mismo registro, no uno nuevo
+        assertThat(c.getUrlArchivo()).isEqualTo("nueva.jpg");
+        assertThat(c.getEstado()).isEqualTo(EstadoComprobante.PENDIENTE_REVISION);
+        assertThat(c.getMotivoRechazo()).isNull();
+    }
+
+    @Test
+    void subir_primeraVez_creaComprobanteEnRevisionConFecha() {
+        when(equipoTorneoRepo.findById(REF)).thenReturn(
+                Optional.of(inscripcion("delegado-1", EstadoInscripcion.PENDIENTE_PAGO)));
+        when(comprobanteRepo.findByReferenciaId(REF)).thenReturn(List.of());
+
+        service.subir(req("foto.jpg"), "delegado-1");
+
+        var captor = ArgumentCaptor.forClass(Comprobante.class);
+        verify(comprobanteRepo).save(captor.capture());
+        var c = captor.getValue();
+        assertThat(c.getEstado()).isEqualTo(EstadoComprobante.PENDIENTE_REVISION);
+        assertThat(c.getFechaSubida()).isNotNull();  // se setea explicito (new Comprobante no aplica @Builder.Default)
+    }
+
+    @Test
+    void subir_inscripcionNoPendiente_lanzaError_yNoGuarda() {
+        when(equipoTorneoRepo.findById(REF)).thenReturn(
+                Optional.of(inscripcion("delegado-1", EstadoInscripcion.APROBADO)));
+
+        assertThatThrownBy(() -> service.subir(req("foto.jpg"), "delegado-1"))
+                .isInstanceOf(IllegalStateException.class);
+        verify(comprobanteRepo, never()).save(any());
+    }
+
+    // ── M3 (spec 0003): aprobar sin efecto silencioso + MULTA cierra el circulo ──
+
+    private Comprobante comprobante(UUID id, TipoComprobante tipo, UUID ref) {
+        return Comprobante.builder()
+                .id(id).tipo(tipo).referenciaId(ref)
+                .cedulaUploader("delegado-1")
+                .estado(EstadoComprobante.PENDIENTE_REVISION)
+                .build();
+    }
+
+    @Test
+    void aprobar_inscripcionPendiente_apruebaInscripcionYComprobante() {
+        var compId = UUID.randomUUID();
+        var comp = comprobante(compId, TipoComprobante.INSCRIPCION, REF);
+        when(comprobanteRepo.findById(compId)).thenReturn(Optional.of(comp));
+        var et = inscripcion("delegado-1", EstadoInscripcion.PENDIENTE_PAGO);
+        when(equipoTorneoRepo.findById(REF)).thenReturn(Optional.of(et));
+
+        service.aprobar(compId, "admin-1");
+
+        assertThat(et.getEstadoInscripcion()).isEqualTo(EstadoInscripcion.APROBADO);
+        assertThat(comp.getEstado()).isEqualTo(EstadoComprobante.APROBADO);
+    }
+
+    @Test
+    void aprobar_inscripcionYaNoPendiente_lanzaError_noApruebaEnSilencio() {
+        var compId = UUID.randomUUID();
+        var comp = comprobante(compId, TipoComprobante.INSCRIPCION, REF);
+        when(comprobanteRepo.findById(compId)).thenReturn(Optional.of(comp));
+        when(equipoTorneoRepo.findById(REF)).thenReturn(
+                Optional.of(inscripcion("delegado-1", EstadoInscripcion.APROBADO)));
+
+        assertThatThrownBy(() -> service.aprobar(compId, "admin-1"))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(comp.getEstado()).isEqualTo(EstadoComprobante.PENDIENTE_REVISION); // sin cambios
+    }
+
+    @Test
+    void aprobar_comprobanteMulta_marcaMultaPagada() {
+        var compId = UUID.randomUUID();
+        var multaId = UUID.randomUUID();
+        var comp = comprobante(compId, TipoComprobante.MULTA, multaId);
+        when(comprobanteRepo.findById(compId)).thenReturn(Optional.of(comp));
+        var multa = new Multa();
+        multa.setId(multaId);
+        multa.setEstado(EstadoMulta.PENDIENTE);
+        when(multaRepo.findById(multaId)).thenReturn(Optional.of(multa));
+
+        service.aprobar(compId, "admin-1");
+
+        assertThat(multa.getEstado()).isEqualTo(EstadoMulta.PAGADA);
+        assertThat(multa.getFechaPago()).isNotNull();
+        verify(multaRepo).save(multa);
+    }
+
+    @Test
+    void subir_multaDeOtroDelegado_lanzaError() {
+        var multaId = UUID.randomUUID();
+        var etId = UUID.randomUUID();
+        var r = new SubirComprobanteRequest();
+        r.setTipo("MULTA");
+        r.setReferenciaId(multaId);
+        r.setUrlArchivo("foto.jpg");
+        var multa = new Multa();
+        multa.setId(multaId);
+        multa.setEquipoTorneoId(etId);
+        multa.setEstado(EstadoMulta.PENDIENTE);
+        when(multaRepo.findById(multaId)).thenReturn(Optional.of(multa));
+        when(equipoTorneoRepo.findById(etId)).thenReturn(
+                Optional.of(inscripcion("delegado-A", EstadoInscripcion.PENDIENTE_PAGO)));
+
+        assertThatThrownBy(() -> service.subir(r, "delegado-B"))
+                .isInstanceOf(RuntimeException.class);
+        verify(comprobanteRepo, never()).save(any());
+    }
+}
