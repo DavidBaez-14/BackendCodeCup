@@ -4,7 +4,7 @@ import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import terminus.co.edu.ufps.codecup.identidad.model.Cuenta;
+import terminus.co.edu.ufps.codecup.identidad.model.EstadoCuenta;
 import terminus.co.edu.ufps.codecup.identidad.repository.CuentaRepository;
 import terminus.co.edu.ufps.codecup.identidad.repository.PersonaRepository;
 
@@ -24,10 +24,15 @@ public class DirectorioPersonas {
         String numero = Documentos.normalizar(numeroDocumento);
         if (numero == null) return Optional.empty();
         return personaRepository.findFirstByNumeroDocumento(numero)
-                .map(p -> new PersonaResumen(
-                        p.getId(),
-                        p.getNumeroDocumento(),
-                        p.nombreCompleto(),
-                        cuentaRepository.findByPersonaId(p.getId()).map(Cuenta::getCorreo).orElse(null)));
+                .map(p -> {
+                    var cuenta = cuentaRepository.findByPersonaId(p.getId());
+                    return new PersonaResumen(
+                            p.getId(),
+                            p.getNumeroDocumento(),
+                            p.nombreCompleto(),
+                            cuenta.map(c -> c.getCorreo()).orElse(null),
+                            cuenta.isPresent(),
+                            cuenta.map(c -> c.getEstado() == EstadoCuenta.BLOQUEADA).orElse(false));
+                });
     }
 }

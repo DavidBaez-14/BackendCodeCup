@@ -48,6 +48,8 @@ class DirectorioPersonasTest {
         assertThat(encontrado.personaId()).isEqualTo(persona.getId());
         assertThat(encontrado.nombreCompleto()).isEqualTo("Luis Gómez");
         assertThat(encontrado.correo()).isEqualTo("luis@correo.test");
+        assertThat(encontrado.tieneCuenta()).isTrue();
+        assertThat(encontrado.cuentaBloqueada()).isFalse();
     }
 
     @Test
@@ -55,9 +57,30 @@ class DirectorioPersonasTest {
         personaRepository.save(Persona.builder()
                 .nombres("Sofía").tipoDocumento(TipoDocumento.TI).numeroDocumento("1001002003").build());
 
-        assertThat(directorio.buscarPorDocumento("1001002003")).get()
-                .extracting(PersonaResumen::correo).isNull();
+        var sinCuenta = directorio.buscarPorDocumento("1001002003").orElseThrow();
+        assertThat(sinCuenta.correo()).isNull();
+        assertThat(sinCuenta.tieneCuenta()).isFalse();
+        assertThat(sinCuenta.cuentaBloqueada()).isFalse();
         assertThat(directorio.buscarPorDocumento("5550001112")).isEmpty();
         assertThat(directorio.buscarPorDocumento("  ")).isEmpty();
+    }
+
+    /** Spec 0018, criterio 8: la competición necesita saber si la cuenta está bloqueada. */
+    @Test
+    void cuentaBloqueada_seInforma() {
+        var persona = personaRepository.save(Persona.builder()
+                .nombres("Mario").apellidos("Rojas")
+                .tipoDocumento(TipoDocumento.CC).numeroDocumento("1090111222")
+                .build());
+        cuentaRepository.save(Cuenta.builder()
+                .proveedor(Cuenta.PROVEEDOR_SUPABASE).proveedorSub(UUID.randomUUID().toString())
+                .correo("mario@correo.test").persona(persona)
+                .estado(EstadoCuenta.BLOQUEADA).fechaCreacion(LocalDateTime.now())
+                .build());
+
+        var encontrado = directorio.buscarPorDocumento("1090111222").orElseThrow();
+
+        assertThat(encontrado.tieneCuenta()).isTrue();
+        assertThat(encontrado.cuentaBloqueada()).isTrue();
     }
 }

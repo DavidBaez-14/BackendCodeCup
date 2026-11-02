@@ -9,8 +9,8 @@ import java.util.UUID;
 /**
  * Solicitud de un jugador para ingresar al plantel de un equipo en un torneo.
  *
- * Nombre y correo se snapshotean del padrón MS1 al crear porque la tabla
- * los exige NOT NULL — sirven como display estable aunque MS1 cambie.
+ * Nombre y correo se copian de la persona registrada al crear (la tabla los
+ * exige NOT NULL). Quien pide el ingreso siempre tiene cuenta.
  */
 @Data
 @Builder

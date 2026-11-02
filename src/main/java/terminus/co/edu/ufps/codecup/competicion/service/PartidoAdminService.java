@@ -466,28 +466,22 @@ public class PartidoAdminService {
     }
 
     private String resolverNombreReal(EventoPartido e) {
-        UUID torneoId = e.getEquipoTorneo().getTorneo().getId();
-        String snapshot = jugadorEquipoRepo
-                .findByCedulaAndTorneoId(e.getCedula(), torneoId)
-                .map(JugadorEquipo::getNombreSnapshot)
-                .filter(s -> s != null && !s.isBlank())
-                .orElse(null);
-        if (snapshot != null) return snapshot;
-        return directorioPersonas.buscarPorDocumento(e.getCedula())
-                .map(PersonaResumen::nombreCompleto)
-                .orElse(null);
+        return resolverNombreReal(e.getCedula(), e.getEquipoTorneo().getTorneo().getId());
     }
 
+    /**
+     * Spec 0018: el nombre registrado gana, porque lo decide la persona. Si no tiene
+     * cuenta, el snapshot del torneo (lo que escribio el delegado al agregarlo).
+     */
     private String resolverNombreReal(String cedula, UUID torneoId) {
         if (cedula == null) return null;
-        String snapshot = jugadorEquipoRepo
+        var registrado = directorioPersonas.buscarPorDocumento(cedula)
+                .map(PersonaResumen::nombreCompleto);
+        if (registrado.isPresent()) return registrado.get();
+        return jugadorEquipoRepo
                 .findByCedulaAndTorneoId(cedula, torneoId)
                 .map(JugadorEquipo::getNombreSnapshot)
                 .filter(s -> s != null && !s.isBlank())
-                .orElse(null);
-        if (snapshot != null) return snapshot;
-        return directorioPersonas.buscarPorDocumento(cedula)
-                .map(PersonaResumen::nombreCompleto)
                 .orElse(null);
     }
 }

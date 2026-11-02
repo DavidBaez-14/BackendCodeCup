@@ -45,10 +45,11 @@ public class JugadorEquipo {
     @Column(name = "numero_camiseta")
     private Integer numeroCamiseta;
 
-    // ─── Snapshot académico al momento de inscripción ─────────────
-    // Se llena consultando MS1 una sola vez. Inmutable para garantizar
-    // reportes históricos correctos (ej. "Estudiantes por semestre" de
-    // un torneo pasado debe reflejar el semestre que tenían entonces).
+    // ─── Snapshot al momento de inscripción ───────────────────────
+    // Registro histórico del torneo (ej. "Estudiantes por semestre" de un
+    // torneo pasado debe reflejar el semestre que tenían entonces). El nombre
+    // es el de la persona registrada o el que escribió el delegado si no tiene
+    // cuenta (spec 0018). Semestre y rol los llenará el CSV de informes (M5).
     @Column(name = "nombre_snapshot", length = 150)
     private String nombreSnapshot;
 

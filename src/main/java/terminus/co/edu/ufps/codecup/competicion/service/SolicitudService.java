@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import terminus.co.edu.ufps.codecup.shared.error.ApiException;
 import terminus.co.edu.ufps.codecup.shared.error.ResourceNotFoundException;
 import terminus.co.edu.ufps.codecup.identidad.api.PersonaResumen;
 import terminus.co.edu.ufps.codecup.identidad.api.DirectorioPersonas;
@@ -116,6 +117,14 @@ public class SolicitudService {
         validarDelegadoEsDueno(solicitud, cedulaDelegado);
         if (solicitud.getEstado() != EstadoSolicitud.PENDIENTE) {
             throw new RuntimeException("La solicitud ya fue resuelta: " + solicitud.getEstado());
+        }
+        // Spec 0018: si lo bloquearon despues de pedir el ingreso, no entra al plantel.
+        boolean bloqueada = directorioPersonas.buscarPorDocumento(solicitud.getCedula())
+                .map(PersonaResumen::cuentaBloqueada)
+                .orElse(false);
+        if (bloqueada) {
+            throw ApiException.conflict("JUGADOR_BLOQUEADO",
+                    "Esta persona tiene la cuenta bloqueada: no puede entrar a un plantel.");
         }
         if (jugadorEquipoRepo.existsByCedulaAndTorneoId(
                 solicitud.getCedula(), solicitud.getTorneo().getId())) {

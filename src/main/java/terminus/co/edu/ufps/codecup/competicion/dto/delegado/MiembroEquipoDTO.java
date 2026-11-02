@@ -19,4 +19,6 @@ public class MiembroEquipoDTO {
     private LocalDate desde;
     private Boolean esDelegado;
     private String torneoEstado;
+    /** false = el delegado lo agregó sin cuenta: aún no puede iniciar sesión (spec 0018). */
+    private Boolean tieneCuenta;
 }

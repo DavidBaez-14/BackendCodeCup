@@ -9,13 +9,15 @@ import java.time.LocalDateTime;
 /**
  * Perfil deportivo + cosmético del jugador en MS2.
  *
- * Los datos académicos oficiales (rol académico, código universitario,
- * semestre) viven en MS1 (padrón) y se snapshotean en {@link JugadorEquipo}
- * al momento de inscripción para reportes históricos.
+ * La llave sigue siendo el número de documento (normalizado) hasta M2.
+ * El jugador puede no tener cuenta: el delegado lo agrega con su nombre
+ * (spec 0018). Si se registra después, hereda esta fila y su historial.
  *
- * Nombre y correo se copian del padrón MS1 al crear la fila local porque la
- * tabla los exige NOT NULL — sirven como display si MS1 no responde, pero la
- * fuente de verdad sigue siendo MS1.
+ * Nombre y correo se copian al crear la fila (la tabla exige el nombre NOT
+ * NULL): de la persona registrada o, si no tiene cuenta, el nombre que
+ * escribió el delegado. Para mostrar, gana el nombre de la persona registrada.
+ * Los datos académicos (semestre, rol) ya no vienen de un padrón: los llenará
+ * el CSV opcional de informes (M5) en los snapshots de {@link JugadorEquipo}.
  */
 @Data
 @Builder
