@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import terminus.co.edu.ufps.codecup.shared.error.ApiException;
 import terminus.co.edu.ufps.codecup.shared.error.ResourceNotFoundException;
 import terminus.co.edu.ufps.codecup.competicion.model.EquipoTorneo;
 import terminus.co.edu.ufps.codecup.competicion.model.EstadoInscripcion;
@@ -38,12 +39,14 @@ public class ComprobanteService {
             throw new RuntimeException("Tipo de comprobante invalido: " + req.getTipo());
         }
 
+        UUID equipoTorneoDelArchivo;
         if (tipo == TipoComprobante.INSCRIPCION) {
             var et = equipoTorneoRepo.findById(req.getReferenciaId())
                     .orElseThrow(() -> new ResourceNotFoundException("EquipoTorneo no encontrado."));
-            if (!et.getDelegadoCedula().equals(cedulaUploader)) {
-                throw new RuntimeException("No eres el delegado de esta inscripcion.");
+            if (!esDelegado(et, cedulaUploader)) {
+                throw inscripcionAjena();
             }
+            equipoTorneoDelArchivo = et.getId();
             // Solo se puede subir/reemplazar mientras la inscripcion siga pendiente de pago.
             if (et.getEstadoInscripcion() != EstadoInscripcion.PENDIENTE_PAGO) {
                 throw new IllegalStateException(
@@ -56,12 +59,23 @@ public class ComprobanteService {
                     .orElseThrow(() -> new ResourceNotFoundException("Multa no encontrada."));
             var et = equipoTorneoRepo.findById(multa.getEquipoTorneoId())
                     .orElseThrow(() -> new ResourceNotFoundException("Equipo de la multa no encontrado."));
-            if (!et.getDelegadoCedula().equals(cedulaUploader)) {
-                throw new RuntimeException("No eres el delegado del equipo de esta multa.");
+            if (!esDelegado(et, cedulaUploader)) {
+                throw ApiException.forbidden("MULTA_AJENA", "No eres el delegado del equipo de esta multa.");
             }
             if (multa.getEstado() == EstadoMulta.PAGADA) {
                 throw new IllegalStateException("La multa ya esta pagada.");
             }
+            equipoTorneoDelArchivo = et.getId();
+        } else {
+            throw new RuntimeException("Tipo de comprobante no soportado: " + tipo);
+        }
+
+        // El archivo debe estar en la carpeta del propio equipo (la que entrega upload-url).
+        // Si no, un delegado podria registrar la ruta del archivo de otro equipo y luego
+        // descargarlo con download-url de su propio comprobante (spec 0001).
+        if (!archivoEnCarpetaDe(req.getUrlArchivo(), equipoTorneoDelArchivo)) {
+            throw ApiException.forbidden("ARCHIVO_AJENO",
+                    "El archivo del comprobante no corresponde a tu equipo. Vuelve a subirlo.");
         }
 
         // Upsert: un comprobante por referencia. Si ya existe, se reemplaza (el delegado
@@ -160,11 +174,66 @@ public class ComprobanteService {
         return toDTO(c);
     }
 
+    /**
+     * Spec 0001: antes de firmar una URL de subida, la inscripcion debe ser del delegado y
+     * seguir pendiente de pago. La clave del archivo es fija por inscripcion y se sobrescribe,
+     * asi que sin este control un delegado podria reemplazar el archivo de otro equipo, o el
+     * suyo ya aprobado (la evidencia que reviso el admin).
+     */
     @Transactional(readOnly = true)
-    public ComprobanteDTO obtenerComprobante(UUID id) {
-        return comprobanteRepo.findById(id)
-                .map(this::toDTO)
-                .orElse(null);
+    public void validarSubidaPropia(UUID equipoTorneoId, String cedulaDelegado) {
+        var et = equipoTorneoRepo.findById(equipoTorneoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Inscripcion no encontrada."));
+        if (!esDelegado(et, cedulaDelegado)) {
+            throw inscripcionAjena();
+        }
+        if (et.getEstadoInscripcion() != EstadoInscripcion.PENDIENTE_PAGO) {
+            throw ApiException.conflict("INSCRIPCION_SIN_PAGO_PENDIENTE",
+                    "La inscripcion ya no admite comprobantes (estado: " + et.getEstadoInscripcion() + ").");
+        }
+    }
+
+    /**
+     * Spec 0001: el admin descarga cualquier comprobante; un delegado, solo los de su equipo.
+     * La propiedad se resuelve por el objeto referenciado (inscripcion o multa) y su delegado
+     * actual, no por quien lo subio.
+     *
+     * @return la clave del archivo en Storage
+     */
+    @Transactional(readOnly = true)
+    public String archivoParaDescarga(UUID comprobanteId, String cedula, boolean esAdmin) {
+        var c = comprobanteRepo.findById(comprobanteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Comprobante no encontrado."));
+        if (!esAdmin && !esDelegado(equipoDelComprobante(c), cedula)) {
+            throw ApiException.forbidden("COMPROBANTE_AJENO", "Este comprobante no es de tu equipo.");
+        }
+        return c.getUrlArchivo();
+    }
+
+    private EquipoTorneo equipoDelComprobante(Comprobante c) {
+        UUID equipoTorneoId = switch (c.getTipo()) {
+            case INSCRIPCION -> c.getReferenciaId();
+            case MULTA -> multaRepo.findById(c.getReferenciaId())
+                    .map(m -> m.getEquipoTorneoId())
+                    .orElse(null);
+        };
+        return equipoTorneoId == null ? null : equipoTorneoRepo.findById(equipoTorneoId).orElse(null);
+    }
+
+    private static boolean esDelegado(EquipoTorneo et, String cedula) {
+        return et != null && cedula != null && cedula.equals(et.getDelegadoCedula());
+    }
+
+    /** Solo claves dentro de la carpeta del equipo, sin saltos de ruta. */
+    private static boolean archivoEnCarpetaDe(String urlArchivo, UUID equipoTorneoId) {
+        return urlArchivo != null
+                && urlArchivo.startsWith(equipoTorneoId + "/")
+                && !urlArchivo.contains("..")
+                && !urlArchivo.contains("\\");
+    }
+
+    private static ApiException inscripcionAjena() {
+        return ApiException.forbidden("INSCRIPCION_AJENA", "No eres el delegado de esta inscripcion.");
     }
 
     private ComprobanteDTO toDTO(Comprobante c) {

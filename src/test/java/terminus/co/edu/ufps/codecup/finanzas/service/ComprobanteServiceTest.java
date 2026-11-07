@@ -28,6 +28,7 @@ import terminus.co.edu.ufps.codecup.finanzas.model.Multa;
 import terminus.co.edu.ufps.codecup.finanzas.model.TipoComprobante;
 import terminus.co.edu.ufps.codecup.finanzas.repository.ComprobanteRepository;
 import terminus.co.edu.ufps.codecup.finanzas.repository.MultaRepository;
+import terminus.co.edu.ufps.codecup.shared.error.ApiException;
 
 /**
  * Spec 0014: upsert al reemplazar comprobante (sin duplicar filas), solo mientras la inscripcion
@@ -54,6 +55,7 @@ class ComprobanteServiceTest {
 
     private EquipoTorneo inscripcion(String delegado, EstadoInscripcion estado) {
         var et = new EquipoTorneo();
+        et.setId(REF);
         et.setDelegadoCedula(delegado);
         et.setEstadoInscripcion(estado);
         return et;
@@ -74,13 +76,13 @@ class ComprobanteServiceTest {
                 .build();
         when(comprobanteRepo.findByReferenciaId(REF)).thenReturn(List.of(existente));
 
-        service.subir(req("nueva.jpg"), "delegado-1");
+        service.subir(req(REF + "/comprobante"), "delegado-1");
 
         var captor = ArgumentCaptor.forClass(Comprobante.class);
         verify(comprobanteRepo).save(captor.capture());
         var c = captor.getValue();
         assertThat(c.getId()).isEqualTo(existente.getId());   // mismo registro, no uno nuevo
-        assertThat(c.getUrlArchivo()).isEqualTo("nueva.jpg");
+        assertThat(c.getUrlArchivo()).isEqualTo(REF + "/comprobante");
         assertThat(c.getEstado()).isEqualTo(EstadoComprobante.PENDIENTE_REVISION);
         assertThat(c.getMotivoRechazo()).isNull();
     }
@@ -91,7 +93,7 @@ class ComprobanteServiceTest {
                 Optional.of(inscripcion("delegado-1", EstadoInscripcion.PENDIENTE_PAGO)));
         when(comprobanteRepo.findByReferenciaId(REF)).thenReturn(List.of());
 
-        service.subir(req("foto.jpg"), "delegado-1");
+        service.subir(req(REF + "/comprobante"), "delegado-1");
 
         var captor = ArgumentCaptor.forClass(Comprobante.class);
         verify(comprobanteRepo).save(captor.capture());
@@ -105,7 +107,7 @@ class ComprobanteServiceTest {
         when(equipoTorneoRepo.findById(REF)).thenReturn(
                 Optional.of(inscripcion("delegado-1", EstadoInscripcion.APROBADO)));
 
-        assertThatThrownBy(() -> service.subir(req("foto.jpg"), "delegado-1"))
+        assertThatThrownBy(() -> service.subir(req(REF + "/comprobante"), "delegado-1"))
                 .isInstanceOf(IllegalStateException.class);
         verify(comprobanteRepo, never()).save(any());
     }
@@ -183,6 +185,42 @@ class ComprobanteServiceTest {
 
         assertThatThrownBy(() -> service.subir(r, "delegado-B"))
                 .isInstanceOf(RuntimeException.class);
+        verify(comprobanteRepo, never()).save(any());
+    }
+
+    // ── Spec 0001: el archivo debe estar en la carpeta del propio equipo ──
+
+    @Test
+    void subir_multaPropiaConArchivoDeOtraCarpeta_lanza403ArchivoAjeno_yNoGuarda() {
+        var multaId = UUID.randomUUID();
+        var etId = UUID.randomUUID();
+        var r = new SubirComprobanteRequest();
+        r.setTipo("MULTA");
+        r.setReferenciaId(multaId);
+        r.setUrlArchivo(UUID.randomUUID() + "/comprobante"); // carpeta de otro equipo
+        var multa = new Multa();
+        multa.setId(multaId);
+        multa.setEquipoTorneoId(etId);
+        multa.setEstado(EstadoMulta.PENDIENTE);
+        when(multaRepo.findById(multaId)).thenReturn(Optional.of(multa));
+        var et = inscripcion("delegado-A", EstadoInscripcion.APROBADO);
+        et.setId(etId);
+        when(equipoTorneoRepo.findById(etId)).thenReturn(Optional.of(et));
+
+        assertThatThrownBy(() -> service.subir(r, "delegado-A"))
+                .isInstanceOf(ApiException.class)
+                .extracting("code").isEqualTo("ARCHIVO_AJENO");
+        verify(comprobanteRepo, never()).save(any());
+    }
+
+    @Test
+    void subir_conSaltoDeRuta_lanza403ArchivoAjeno() {
+        when(equipoTorneoRepo.findById(REF)).thenReturn(
+                Optional.of(inscripcion("delegado-1", EstadoInscripcion.PENDIENTE_PAGO)));
+
+        assertThatThrownBy(() -> service.subir(req(REF + "/../otro/comprobante"), "delegado-1"))
+                .isInstanceOf(ApiException.class)
+                .extracting("code").isEqualTo("ARCHIVO_AJENO");
         verify(comprobanteRepo, never()).save(any());
     }
 }
