@@ -13,8 +13,8 @@ import lombok.NoArgsConstructor;
 public class PerfilResponseDTO {
     private String cedula;
     private String nombre;
-    // Datos deportivos del Jugador local. Null si aun no completo su perfil
-    // (el frontend usa esto para mostrar el modal bloqueante de bienvenida).
+    // Datos deportivos del Jugador local. Opcionales (spec 0020): null si el
+    // jugador aun no los indico.
     private Integer alturaCm;
     private String piernaHabil;
     private String posicion;

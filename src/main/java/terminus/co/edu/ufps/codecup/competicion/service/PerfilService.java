@@ -150,20 +150,20 @@ public class PerfilService {
             java.util.Set.of("PORTERO", "DEFENSA", "MEDIOCAMPISTA", "DELANTERO");
 
     /**
-     * Persiste los datos deportivos del jugador. Tipicamente lo invoca el
-     * modal bloqueante de bienvenida la primera vez, y el form de edicion
-     * del tab "Perfil" en ediciones posteriores.
+     * Persiste los datos deportivos del jugador desde el tab "Perfil". Los tres
+     * son opcionales (spec 0020): se valida solo lo que llega y el resto queda
+     * en null (el PUT reemplaza, asi se puede borrar un dato).
      */
     @Transactional
     public PerfilResponseDTO actualizarPerfilDeportivo(String cedula, String nombreJwt, String emailJwt,
                                                        Integer alturaCm, String piernaHabil, String posicion) {
-        if (alturaCm == null || alturaCm < 100 || alturaCm > 250) {
+        if (alturaCm != null && (alturaCm < 100 || alturaCm > 250)) {
             throw new RuntimeException("Altura debe estar entre 100 y 250 cm.");
         }
-        if (piernaHabil == null || !PIERNAS_VALIDAS.contains(piernaHabil)) {
+        if (piernaHabil != null && !PIERNAS_VALIDAS.contains(piernaHabil)) {
             throw new RuntimeException("piernaHabil debe ser DERECHA, IZQUIERDA o AMBIDIESTRO.");
         }
-        if (posicion == null || !POSICIONES_VALIDAS.contains(posicion)) {
+        if (posicion != null && !POSICIONES_VALIDAS.contains(posicion)) {
             throw new RuntimeException("posicion debe ser PORTERO, DEFENSA, MEDIOCAMPISTA o DELANTERO.");
         }
 

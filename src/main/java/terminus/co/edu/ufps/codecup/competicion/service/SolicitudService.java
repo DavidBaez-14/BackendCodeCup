@@ -47,9 +47,8 @@ public class SolicitudService {
             throw new RuntimeException("El torneo no esta aceptando jugadores.");
         }
 
-        // El perfil deportivo (altura/pierna/posicion) lo captura el modal
-        // bloqueante de bienvenida ANTES de llegar aqui. Aqui solo se valida
-        // que ya este completo (defensa en profundidad si el frontend falla).
+        // El perfil deportivo (altura/pierna/posicion) es opcional (spec 0020):
+        // no se exige para pedir ingreso. Al aprobar se copia lo que haya.
         var jugador = jugadorRepo.findById(cedula).orElseGet(() -> {
             var persona = directorioPersonas.buscarPorDocumento(cedula)
                     .orElseThrow(() -> new RuntimeException(
@@ -60,11 +59,6 @@ public class SolicitudService {
                     .correo(persona.correo())
                     .build());
         });
-        if (jugador.getAlturaCm() == null
-                || jugador.getPiernaHabil() == null || jugador.getPiernaHabil().isBlank()
-                || jugador.getPosicion() == null || jugador.getPosicion().isBlank()) {
-            throw new RuntimeException("Completa tu perfil deportivo antes de solicitar ingreso.");
-        }
 
         // Validaciones de negocio
         if (jugadorEquipoRepo.existsByCedulaAndTorneoId(cedula, torneo.getId())) {
@@ -165,9 +159,8 @@ public class SolicitudService {
     }
 
     /**
-     * Snapshot deportivo desde el Jugador local. Si el perfil esta incompleto
-     * en este punto es un bug del caller (el modal bloqueante deberia haber
-     * impedido llegar hasta aqui); aun asi guardamos null sin romper.
+     * Snapshot deportivo desde el Jugador local. El perfil es opcional
+     * (spec 0020): lo que falte queda en null.
      */
     private void poblarSnapshotDeportivo(JugadorEquipo je, String cedula) {
         jugadorRepo.findById(cedula).ifPresent(j -> {

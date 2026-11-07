@@ -172,13 +172,8 @@ public class DelegadoService {
                             "El delegado no tiene una persona registrada en CodeCup."));
             // jugador_equipo.cedula tiene FK a jugadores, asi que garantizamos
             // la fila local antes de insertar JugadorEquipo.
+            // El perfil deportivo es opcional (spec 0020): lo que falte queda en null.
             var jugadorLocal = garantizarJugadorLocal(delegadoCedula);
-            if (jugadorLocal.getAlturaCm() == null
-                    || jugadorLocal.getPiernaHabil() == null || jugadorLocal.getPiernaHabil().isBlank()
-                    || jugadorLocal.getPosicion() == null || jugadorLocal.getPosicion().isBlank()) {
-                throw new RuntimeException(
-                        "Completa tu perfil deportivo (altura, pierna habil, posicion) antes de inscribir el equipo.");
-            }
             var je = JugadorEquipo.builder()
                     .cedula(delegadoCedula)
                     .torneo(torneo)

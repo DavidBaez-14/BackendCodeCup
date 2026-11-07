@@ -16,7 +16,7 @@ final class DatosDePrueba {
     static final String TORNEO_INSCRIPCIONES = "Copa Prueba 2026";
     static final String TORNEO_ARBITRO = "Liga Relámpago (prueba)";
 
-    /** Perfil deportivo. null = sin perfil (para probar el modal de bienvenida del jugador). */
+    /** Perfil deportivo. null = sin perfil (prueba que el perfil es opcional, spec 0020). */
     record Perfil(int alturaCm, String piernaHabil, String posicion) {
     }
 
@@ -66,7 +66,7 @@ final class DatosDePrueba {
         }
         for (int i = 0; i < NOMBRES.length; i++) {
             int numero = i + 1;
-            // jugador22 y jugador23 quedan sin perfil deportivo: prueban el modal de bienvenida.
+            // jugador22 y jugador23 quedan sin perfil deportivo: prueban que es opcional (spec 0020).
             Perfil perfil = numero >= 22 ? null : perfil(10 + i);
             lista.add(new UsuarioPrueba(String.format("jugador%02d", numero), NOMBRES[i], APELLIDOS[i],
                     String.format("90000003%02d", numero), List.of(Rol.JUGADOR), perfil));
