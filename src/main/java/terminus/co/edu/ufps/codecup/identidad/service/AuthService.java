@@ -55,7 +55,7 @@ public class AuthService {
         // CC 1090 y TI 1090 serían la misma "cédula". Por eso no se repite el número.
         if (personaRepository.existsByNumeroDocumento(numero)) {
             throw ApiException.conflict("DOCUMENTO_REGISTRADO",
-                    "Ese documento ya está registrado. Si es tuyo, comunícate con un administrador.");
+                    "Ya existe una cuenta con este documento. Entra con la forma que usaste la primera vez (Google o tu correo y contraseña).");
         }
 
         var persona = personaRepository.save(Persona.builder()
