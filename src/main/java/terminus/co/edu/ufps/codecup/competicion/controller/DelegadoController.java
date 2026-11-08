@@ -18,6 +18,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
+import terminus.co.edu.ufps.codecup.shared.security.JwtClaims;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -33,17 +35,17 @@ public class DelegadoController {
     public ResponseEntity<EquipoDTO> crearEquipo(
             @RequestBody CrearEquipoRequest req,
             @AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok(delegadoService.crearEquipo(jwt.getClaimAsString("cedula"), req));
+        return ResponseEntity.ok(delegadoService.crearEquipo(JwtClaims.personaId(jwt), req));
     }
 
     @GetMapping("/equipos/mi-equipo")
     public ResponseEntity<EquipoDTO> miEquipo(@AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok(delegadoService.miEquipo(jwt.getClaimAsString("cedula")));
+        return ResponseEntity.ok(delegadoService.miEquipo(JwtClaims.personaId(jwt)));
     }
 
     @GetMapping("/torneos/disponibles")
     public ResponseEntity<List<TorneoDisponibleDTO>> torneos(@AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok(delegadoService.torneosDisponibles(jwt.getClaimAsString("cedula")));
+        return ResponseEntity.ok(delegadoService.torneosDisponibles(JwtClaims.personaId(jwt)));
     }
 
     @GetMapping("/torneos/{torneoId}/inscripcion-info")
@@ -51,26 +53,26 @@ public class DelegadoController {
             @PathVariable UUID torneoId,
             @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(delegadoService.obtenerInscripcionInfo(
-                jwt.getClaimAsString("cedula"), torneoId));
+                JwtClaims.personaId(jwt), torneoId));
     }
 
     @PostMapping("/torneos/{torneoId}/inscribir")
     public ResponseEntity<InscripcionDTO> inscribir(
             @PathVariable UUID torneoId,
             @AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok(delegadoService.inscribir(jwt.getClaimAsString("cedula"), torneoId));
+        return ResponseEntity.ok(delegadoService.inscribir(JwtClaims.personaId(jwt), torneoId));
     }
 
     @GetMapping("/inscripciones/mias")
     public ResponseEntity<List<InscripcionDTO>> misInscripciones(@AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok(delegadoService.misInscripciones(jwt.getClaimAsString("cedula")));
+        return ResponseEntity.ok(delegadoService.misInscripciones(JwtClaims.personaId(jwt)));
     }
 
     @GetMapping("/equipo-torneo/{equipoTorneoId}/miembros")
     public ResponseEntity<List<MiembroEquipoDTO>> miembros(
             @PathVariable UUID equipoTorneoId,
             @AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok(delegadoService.miembros(jwt.getClaimAsString("cedula"), equipoTorneoId));
+        return ResponseEntity.ok(delegadoService.miembros(JwtClaims.personaId(jwt), equipoTorneoId));
     }
 
     // ── HU44 — Agregar miembro ──────────────────────────────
@@ -80,28 +82,28 @@ public class DelegadoController {
             @RequestBody @Valid AgregarMiembroRequest req,
             @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(
-                delegadoService.agregarMiembro(jwt.getClaimAsString("cedula"), equipoTorneoId, req));
+                delegadoService.agregarMiembro(JwtClaims.personaId(jwt), equipoTorneoId, req));
     }
 
     // ── HU44 — Remover miembro ──────────────────────────────
-    @PostMapping("/equipo-torneo/{equipoTorneoId}/miembros/{cedula}/remover")
+    @PostMapping("/equipo-torneo/{equipoTorneoId}/miembros/{personaId}/remover")
     public ResponseEntity<MiembroEquipoDTO> removerMiembro(
             @PathVariable UUID equipoTorneoId,
-            @PathVariable String cedula,
+            @PathVariable UUID personaId,
             @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(
-                delegadoService.removerMiembro(jwt.getClaimAsString("cedula"), equipoTorneoId, cedula));
+                delegadoService.removerMiembro(JwtClaims.personaId(jwt), equipoTorneoId, personaId));
     }
 
     // ── HU44 — Actualizar número de camiseta ──────────────
-    @PatchMapping("/equipo-torneo/{equipoTorneoId}/miembros/{cedula}/camiseta")
+    @PatchMapping("/equipo-torneo/{equipoTorneoId}/miembros/{personaId}/camiseta")
     public ResponseEntity<MiembroEquipoDTO> actualizarCamiseta(
             @PathVariable UUID equipoTorneoId,
-            @PathVariable String cedula,
+            @PathVariable UUID personaId,
             @RequestBody @Valid ActualizarCamisetaRequest req,
             @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(
                 delegadoService.actualizarCamiseta(
-                        jwt.getClaimAsString("cedula"), equipoTorneoId, cedula, req.getNumeroCamiseta()));
+                        JwtClaims.personaId(jwt), equipoTorneoId, personaId, req.getNumeroCamiseta()));
     }
 }

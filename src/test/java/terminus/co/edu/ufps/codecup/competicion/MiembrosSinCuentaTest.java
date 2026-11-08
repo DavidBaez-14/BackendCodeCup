@@ -40,7 +40,6 @@ import terminus.co.edu.ufps.codecup.competicion.repository.EquipoRepository;
 import terminus.co.edu.ufps.codecup.competicion.repository.EquipoTorneoRepository;
 import terminus.co.edu.ufps.codecup.competicion.repository.EventoPartidoRepository;
 import terminus.co.edu.ufps.codecup.competicion.repository.JugadorEquipoRepository;
-import terminus.co.edu.ufps.codecup.competicion.repository.JugadorRepository;
 import terminus.co.edu.ufps.codecup.competicion.repository.PartidoJugadorRepository;
 import terminus.co.edu.ufps.codecup.competicion.repository.PartidoRepository;
 import terminus.co.edu.ufps.codecup.competicion.repository.SolicitudEquipoRepository;
@@ -48,11 +47,15 @@ import terminus.co.edu.ufps.codecup.competicion.repository.TorneoRepository;
 import terminus.co.edu.ufps.codecup.identidad.AuthTestSupport;
 import terminus.co.edu.ufps.codecup.identidad.model.Cuenta;
 import terminus.co.edu.ufps.codecup.identidad.model.EstadoCuenta;
+import terminus.co.edu.ufps.codecup.identidad.model.Persona;
 import terminus.co.edu.ufps.codecup.identidad.model.Rol;
+import terminus.co.edu.ufps.codecup.identidad.model.TipoDocumento;
 
 /**
- * Spec 0018: el delegado agrega miembros sin cuenta, el documento se normaliza,
- * una cuenta bloqueada no entra a ningún plantel y el nombre registrado gana al mostrar.
+ * Spec 0018 (adaptada a la 0022): el delegado agrega miembros sin cuenta, el documento se
+ * normaliza, una cuenta bloqueada no entra a ningún plantel y el nombre registrado gana al
+ * mostrar. Desde la 0022 un miembro sin cuenta es una {@code identidad.personas} sin cuenta, y
+ * quien se registra después con su documento queda asociado a esa misma persona.
  *
  * <p>El H2 se comparte entre clases: cada test arma su propio torneo con documentos al azar.
  */
@@ -63,7 +66,6 @@ class MiembrosSinCuentaTest extends AuthTestSupport {
     @Autowired TorneoRepository torneoRepository;
     @Autowired EquipoRepository equipoRepository;
     @Autowired EquipoTorneoRepository equipoTorneoRepository;
-    @Autowired JugadorRepository jugadorRepository;
     @Autowired JugadorEquipoRepository jugadorEquipoRepository;
     @Autowired PartidoRepository partidoRepository;
     @Autowired PartidoJugadorRepository partidoJugadorRepository;
@@ -73,24 +75,37 @@ class MiembrosSinCuentaTest extends AuthTestSupport {
     // ── Criterios 1 a 7: agregar miembros ───────────────────────────────
 
     @Test
-    void sinCuenta_conNombre_creaJugadorYSnapshot_sinPersona() throws Exception {
+    void sinCuenta_conNombre_creaPersonaSinCuentaYSnapshot() throws Exception {
         var m = mundo();
         String doc = documentoAlAzar();
 
         agregar(m, cuerpo(doc, "  Ana Pérez  "))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.cedula").value(doc))
+                .andExpect(jsonPath("$.numeroDocumento").value(doc))
+                .andExpect(jsonPath("$.personaId").isNotEmpty())
                 .andExpect(jsonPath("$.nombre").value("Ana Pérez"))
                 .andExpect(jsonPath("$.tieneCuenta").value(false))
                 .andExpect(jsonPath("$.estado").value("ACTIVO"));
 
-        var jugador = jugadorRepository.findById(doc).orElseThrow();
-        assertThat(jugador.getNombre()).isEqualTo("Ana Pérez");
-        assertThat(jugador.getCorreo()).isNull();
-        var je = jugadorEquipoRepository.findByCedulaAndTorneoId(doc, m.torneo().getId()).orElseThrow();
+        Persona persona = persona(doc);
+        assertThat(persona.getNombres()).isEqualTo("Ana Pérez");
+        assertThat(persona.getTipoDocumento()).isEqualTo(TipoDocumento.CC);
+        assertThat(cuentaRepository.findByPersonaId(persona.getId())).isEmpty();
+        var je = jugadorEquipoRepository.findByPersonaIdAndTorneoId(persona.getId(), m.torneo().getId()).orElseThrow();
         assertThat(je.getNombreSnapshot()).isEqualTo("Ana Pérez");
         assertThat(je.getEstado()).isEqualTo(EstadoMembresia.ACTIVO);
-        assertThat(personaRepository.existsByNumeroDocumento(doc)).isFalse();
+    }
+
+    @Test
+    void sinCuenta_conTipoDeDocumento_loGuarda() throws Exception {
+        var m = mundo();
+        String doc = documentoAlAzar();
+        var c = cuerpo(doc, "Tomás Niño");
+        c.put("tipoDocumento", "TI");
+
+        agregar(m, c).andExpect(status().isOk());
+
+        assertThat(persona(doc).getTipoDocumento()).isEqualTo(TipoDocumento.TI);
     }
 
     @Test
@@ -105,8 +120,7 @@ class MiembrosSinCuentaTest extends AuthTestSupport {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("NOMBRE_REQUERIDO"));
 
-        assertThat(jugadorRepository.findById(doc)).isEmpty();
-        assertThat(jugadorEquipoRepository.findByCedulaAndTorneoId(doc, m.torneo().getId())).isEmpty();
+        assertThat(personaRepository.existsByNumeroDocumento(doc)).isFalse();
     }
 
     @Test
@@ -119,12 +133,12 @@ class MiembrosSinCuentaTest extends AuthTestSupport {
                 .andExpect(jsonPath("$.nombre").value(NOMBRE_REGISTRADO))
                 .andExpect(jsonPath("$.tieneCuenta").value(true));
 
-        assertThat(jugadorEquipoRepository.findByCedulaAndTorneoId(r.documento(), m.torneo().getId())
+        assertThat(jugadorEquipoRepository.findByPersonaIdAndTorneoId(persona(r.documento()).getId(), m.torneo().getId())
                 .orElseThrow().getNombreSnapshot()).isEqualTo(NOMBRE_REGISTRADO);
     }
 
     @Test
-    void jugadorLocalExistente_nombreOpcional_yNoSeRenombra() throws Exception {
+    void personaSinCuentaExistente_nombreOpcional_yNoSeRenombra() throws Exception {
         String doc = documentoAlAzar();
         agregar(mundo(), cuerpo(doc, "Juan Pérez")).andExpect(status().isOk());
 
@@ -140,9 +154,10 @@ class MiembrosSinCuentaTest extends AuthTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nombre").value("Juancho"));
 
-        assertThat(jugadorEquipoRepository.findByCedulaAndTorneoId(doc, tercero.torneo().getId())
+        var persona = persona(doc);
+        assertThat(jugadorEquipoRepository.findByPersonaIdAndTorneoId(persona.getId(), tercero.torneo().getId())
                 .orElseThrow().getNombreSnapshot()).isEqualTo("Juancho");
-        assertThat(jugadorRepository.findById(doc).orElseThrow().getNombre()).isEqualTo("Juan Pérez");
+        assertThat(persona.getNombres()).isEqualTo("Juan Pérez");
     }
 
     @Test
@@ -153,13 +168,13 @@ class MiembrosSinCuentaTest extends AuthTestSupport {
 
         agregar(m, cuerpo(escrito, "Otro nombre"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.cedula").value(r.documento()))
+                .andExpect(jsonPath("$.numeroDocumento").value(r.documento()))
                 .andExpect(jsonPath("$.nombre").value(NOMBRE_REGISTRADO))
                 .andExpect(jsonPath("$.tieneCuenta").value(true));
 
-        assertThat(jugadorRepository.findById(escrito)).isEmpty();
-        assertThat(jugadorRepository.findById(r.documento())).isPresent();
-        assertThat(jugadorEquipoRepository.findByCedulaAndTorneoId(r.documento(), m.torneo().getId())).isPresent();
+        assertThat(personaRepository.findFirstByNumeroDocumento(escrito)).isEmpty();
+        assertThat(jugadorEquipoRepository.findByPersonaIdAndTorneoId(persona(r.documento()).getId(), m.torneo().getId()))
+                .isPresent();
     }
 
     @Test
@@ -169,9 +184,9 @@ class MiembrosSinCuentaTest extends AuthTestSupport {
 
         agregar(m, cuerpo(pasaporte, "John Smith"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.cedula").value(pasaporte.toUpperCase()));
+                .andExpect(jsonPath("$.numeroDocumento").value(pasaporte.toUpperCase()));
 
-        assertThat(jugadorRepository.findById(pasaporte.toUpperCase())).isPresent();
+        assertThat(personaRepository.findFirstByNumeroDocumento(pasaporte.toUpperCase())).isPresent();
     }
 
     @Test
@@ -189,10 +204,21 @@ class MiembrosSinCuentaTest extends AuthTestSupport {
     }
 
     @Test
+    void nombreDe150Caracteres_cabeEnLaPersona() throws Exception {
+        var m = mundo();
+        String doc = documentoAlAzar();
+
+        agregar(m, cuerpo(doc, "N".repeat(150))).andExpect(status().isOk());
+
+        assertThat(persona(doc).getNombres()).hasSize(150);
+    }
+
+    @Test
     void reglasDeHoy_valenParaSinCuenta() throws Exception {
         var a = mundo();
         String x = documentoAlAzar();
-        agregar(a, Map.of("cedula", x, "nombre", "Ximena", "numeroCamiseta", 10)).andExpect(status().isOk());
+        agregar(a, Map.of("numeroDocumento", x, "nombre", "Ximena", "numeroCamiseta", 10)).andExpect(status().isOk());
+        UUID ximena = persona(x).getId();
 
         // No puede estar ACTIVO en dos equipos del mismo torneo.
         var b = otroEquipoEnElMismoTorneo(a);
@@ -200,7 +226,7 @@ class MiembrosSinCuentaTest extends AuthTestSupport {
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("REGLA_NEGOCIO"));
 
         // La camiseta 10 ya es de Ximena en este equipo.
-        agregar(a, Map.of("cedula", documentoAlAzar(), "nombre", "Yolanda", "numeroCamiseta", 10))
+        agregar(a, Map.of("numeroDocumento", documentoAlAzar(), "nombre", "Yolanda", "numeroCamiseta", 10))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("REGLA_NEGOCIO"));
 
         // Un delegado no agrega en la inscripción de otro.
@@ -211,16 +237,16 @@ class MiembrosSinCuentaTest extends AuthTestSupport {
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("REGLA_NEGOCIO"));
 
         // Se retira, vuelve (con el nombre guardado) y cambia de camiseta.
-        mvc.perform(post("/api/supercopa/delegado/equipo-torneo/{id}/miembros/{cedula}/remover",
-                        a.inscripcion().getId(), x)
+        mvc.perform(post("/api/supercopa/delegado/equipo-torneo/{id}/miembros/{personaId}/remover",
+                        a.inscripcion().getId(), ximena)
                         .header("Authorization", a.delegado().bearer()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.estado").value("RETIRADO"));
         agregar(a, cuerpo(x, null))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.estado").value("ACTIVO"))
                 .andExpect(jsonPath("$.nombre").value("Ximena"));
-        mvc.perform(patch("/api/supercopa/delegado/equipo-torneo/{id}/miembros/{cedula}/camiseta",
-                        a.inscripcion().getId(), x)
+        mvc.perform(patch("/api/supercopa/delegado/equipo-torneo/{id}/miembros/{personaId}/camiseta",
+                        a.inscripcion().getId(), ximena)
                         .header("Authorization", a.delegado().bearer())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("numeroCamiseta", 7))))
@@ -236,7 +262,8 @@ class MiembrosSinCuentaTest extends AuthTestSupport {
         agregar(a, cuerpo(r.documento(), null)).andExpect(status().isOk());
 
         var admin = cuentaConRoles(Rol.ADMINISTRADOR);
-        mvc.perform(delete("/api/admin/roles/cuenta/{cedula}", r.documento())
+        UUID cuentaId = cuentaRepository.findConPersona(Cuenta.PROVEEDOR_SUPABASE, r.usuario().sub()).orElseThrow().getId();
+        mvc.perform(delete("/api/admin/roles/cuenta/{cuentaId}", cuentaId)
                         .header("Authorization", admin.bearer())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("motivo", "Conducta antideportiva"))))
@@ -246,24 +273,26 @@ class MiembrosSinCuentaTest extends AuthTestSupport {
         mvc.perform(get("/api/supercopa/admin/equipo-torneo/{id}/miembros", a.inscripcion().getId())
                         .header("Authorization", admin.bearer()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.cedula == '%s')].nombre", r.documento()).value(contains(NOMBRE_REGISTRADO)))
-                .andExpect(jsonPath("$[?(@.cedula == '%s')].estado", r.documento()).value(contains("ACTIVO")));
+                .andExpect(jsonPath("$[?(@.numeroDocumento == '%s')].nombre", r.documento()).value(contains(NOMBRE_REGISTRADO)))
+                .andExpect(jsonPath("$[?(@.numeroDocumento == '%s')].estado", r.documento()).value(contains("ACTIVO")));
 
         // Pero ningún delegado lo puede sumar a otro plantel.
         var b = mundo();
         agregar(b, cuerpo(r.documento(), null))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("JUGADOR_BLOQUEADO"));
-        assertThat(jugadorEquipoRepository.findByCedulaAndTorneoId(r.documento(), b.torneo().getId())).isEmpty();
+        assertThat(jugadorEquipoRepository.findByPersonaIdAndTorneoId(persona(r.documento()).getId(), b.torneo().getId()))
+                .isEmpty();
     }
 
     @Test
     void cuentaBloqueada_noSeApruebaSuSolicitud() throws Exception {
         var a = mundo();
         var r = registrado();
+        UUID personaId = persona(r.documento()).getId();
         var solicitud = solicitudEquipoRepository.save(SolicitudEquipo.builder()
                 .torneo(a.torneo()).equipoTorneo(a.inscripcion())
-                .cedula(r.documento()).nombre(NOMBRE_REGISTRADO)
+                .personaId(personaId)
                 .build());
         var cuenta = cuentaRepository.findConPersona(Cuenta.PROVEEDOR_SUPABASE, r.usuario().sub()).orElseThrow();
         cuenta.setEstado(EstadoCuenta.BLOQUEADA);
@@ -274,18 +303,19 @@ class MiembrosSinCuentaTest extends AuthTestSupport {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("JUGADOR_BLOQUEADO"));
 
-        assertThat(jugadorEquipoRepository.findByCedulaAndTorneoId(r.documento(), a.torneo().getId())).isEmpty();
+        assertThat(jugadorEquipoRepository.findByPersonaIdAndTorneoId(personaId, a.torneo().getId())).isEmpty();
         assertThat(solicitudEquipoRepository.findById(solicitud.getId()).orElseThrow().getEstado())
                 .isEqualTo(EstadoSolicitud.PENDIENTE);
     }
 
-    // ── Criterios 9 a 11: nombres, plantel y registro posterior ─────────
+    // ── Criterios 9 a 11 de la 0018 y 5 de la 0022 ──────────────────────
 
     @Test
-    void sinCuentaQueSeRegistraDespues_veSuGol_yTodosMuestranSuNombre() throws Exception {
+    void registrarseDespues_asociaLaMismaPersona_veSuGol_yTodosMuestranSuNombre() throws Exception {
         var m = mundo();
         String doc = documentoAlAzar();
         agregar(m, cuerpo(doc, "Ana Pérez")).andExpect(status().isOk());
+        UUID personaId = persona(doc).getId();
 
         // Juega un partido y hace un gol, todavía sin cuenta.
         var rival = otroEquipoEnElMismoTorneo(m);
@@ -297,17 +327,22 @@ class MiembrosSinCuentaTest extends AuthTestSupport {
                 .estado(EstadoPartido.FINALIZADO)
                 .build());
         partidoJugadorRepository.save(PartidoJugador.builder()
-                .partido(partido).jugador(jugadorRepository.findById(doc).orElseThrow())
+                .partido(partido).personaId(personaId)
                 .equipoTorneo(m.inscripcion()).goles(1).jugo(true)
                 .build());
         eventoPartidoRepository.save(EventoPartido.builder()
-                .partido(partido).cedula(doc).equipoTorneo(m.inscripcion())
+                .partido(partido).personaId(personaId).equipoTorneo(m.inscripcion())
                 .tipoEvento(TipoEvento.GOL).orden(1)
                 .build());
 
-        // Se registra después, con el documento escrito con puntos: no choca con nadie.
+        // Se registra después, con el documento escrito con puntos: queda asociado a esa persona.
         var u = usuario();
-        registrar(u, "CC", conPuntos(doc)).andExpect(status().isCreated());
+        registrar(u, "CC", conPuntos(doc))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.personaId").value(personaId.toString()));
+        var cuenta = cuentaRepository.findConPersona(Cuenta.PROVEEDOR_SUPABASE, u.sub()).orElseThrow();
+        assertThat(cuenta.getPersona().getId()).isEqualTo(personaId);
+        assertThat(cuenta.getPersona().nombreCompleto()).isEqualTo(NOMBRE_REGISTRADO);
 
         mvc.perform(get("/api/supercopa/mi-perfil").header("Authorization", u.bearer()))
                 .andExpect(status().isOk())
@@ -317,18 +352,28 @@ class MiembrosSinCuentaTest extends AuthTestSupport {
         mvc.perform(get("/api/supercopa/delegado/equipo-torneo/{id}/miembros", m.inscripcion().getId())
                         .header("Authorization", m.delegado().bearer()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.cedula == '%s')].tieneCuenta", doc).value(contains(true)))
-                .andExpect(jsonPath("$[?(@.cedula == '%s')].nombre", doc).value(contains(NOMBRE_REGISTRADO)));
+                .andExpect(jsonPath("$[?(@.numeroDocumento == '%s')].tieneCuenta", doc).value(contains(true)))
+                .andExpect(jsonPath("$[?(@.numeroDocumento == '%s')].nombre", doc).value(contains(NOMBRE_REGISTRADO)));
 
         var admin = cuentaConRoles(Rol.ADMINISTRADOR);
         mvc.perform(get("/api/supercopa/admin/partidos/{id}/eventos", partido.getId())
                         .header("Authorization", admin.bearer()))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].personaId").value(personaId.toString()))
                 .andExpect(jsonPath("$[0].jugadorNombre").value(NOMBRE_REGISTRADO));
         mvc.perform(get("/api/supercopa/admin/partidos/{id}/alineacion", partido.getId())
                         .header("Authorization", admin.bearer()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.cedula == '%s')].jugadorNombre", doc).value(contains(NOMBRE_REGISTRADO)));
+                .andExpect(jsonPath("$[?(@.numeroDocumento == '%s')].jugadorNombre", doc).value(contains(NOMBRE_REGISTRADO)));
+    }
+
+    @Test
+    void registrarseConElDocumentoDeOtraCuenta_409DocumentoRegistrado() throws Exception {
+        var r = registrado();
+
+        registrar(usuario(), "CC", r.documento())
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("DOCUMENTO_REGISTRADO"));
     }
 
     @Test
@@ -351,9 +396,10 @@ class MiembrosSinCuentaTest extends AuthTestSupport {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$", hasSize(2)))
                     .andExpect(jsonPath("$[*].nombre", everyItem(notNullValue())))
-                    .andExpect(jsonPath("$[?(@.cedula == '%s')].tieneCuenta", r.documento()).value(contains(true)))
-                    .andExpect(jsonPath("$[?(@.cedula == '%s')].tieneCuenta", sinCuenta).value(contains(false)))
-                    .andExpect(jsonPath("$[?(@.cedula == '%s')].nombre", sinCuenta).value(contains("Sara Gómez")));
+                    .andExpect(jsonPath("$[*].personaId", everyItem(notNullValue())))
+                    .andExpect(jsonPath("$[?(@.numeroDocumento == '%s')].tieneCuenta", r.documento()).value(contains(true)))
+                    .andExpect(jsonPath("$[?(@.numeroDocumento == '%s')].tieneCuenta", sinCuenta).value(contains(false)))
+                    .andExpect(jsonPath("$[?(@.numeroDocumento == '%s')].nombre", sinCuenta).value(contains("Sara Gómez")));
         }
     }
 
@@ -382,14 +428,14 @@ class MiembrosSinCuentaTest extends AuthTestSupport {
 
     private Mundo inscribir(Torneo torneo) {
         Usuario delegado = cuentaConRoles(Rol.DELEGADO, Rol.JUGADOR);
-        String cedulaDelegado = cuentaRepository.findConPersona(Cuenta.PROVEEDOR_SUPABASE, delegado.sub())
-                .orElseThrow().getPersona().getNumeroDocumento();
+        UUID delegadoId = cuentaRepository.findConPersona(Cuenta.PROVEEDOR_SUPABASE, delegado.sub())
+                .orElseThrow().getPersona().getId();
         var equipo = equipoRepository.save(Equipo.builder()
-                .nombre("Equipo " + cedulaDelegado)
-                .delegadoCedula(cedulaDelegado)
+                .nombre("Equipo " + delegadoId.toString().substring(0, 8))
+                .delegadoPersonaId(delegadoId)
                 .build());
         var inscripcion = equipoTorneoRepository.save(EquipoTorneo.builder()
-                .torneo(torneo).equipo(equipo).delegadoCedula(cedulaDelegado)
+                .torneo(torneo).equipo(equipo).delegadoPersonaId(delegadoId)
                 .estadoInscripcion(EstadoInscripcion.PENDIENTE_PAGO)
                 .build());
         return new Mundo(delegado, torneo, inscripcion);
@@ -400,6 +446,10 @@ class MiembrosSinCuentaTest extends AuthTestSupport {
         return new Registrado(u, registrar(u));
     }
 
+    private Persona persona(String documento) {
+        return personaRepository.findFirstByNumeroDocumento(documento).orElseThrow();
+    }
+
     private ResultActions agregar(Mundo m, Map<String, Object> cuerpo) throws Exception {
         return mvc.perform(post("/api/supercopa/delegado/equipo-torneo/{id}/miembros", m.inscripcion().getId())
                 .header("Authorization", m.delegado().bearer())
@@ -407,9 +457,9 @@ class MiembrosSinCuentaTest extends AuthTestSupport {
                 .content(json(cuerpo)));
     }
 
-    private static Map<String, Object> cuerpo(String cedula, String nombre) {
+    private static Map<String, Object> cuerpo(String documento, String nombre) {
         var c = new HashMap<String, Object>();
-        c.put("cedula", cedula);
+        c.put("numeroDocumento", documento);
         if (nombre != null) c.put("nombre", nombre);
         return c;
     }

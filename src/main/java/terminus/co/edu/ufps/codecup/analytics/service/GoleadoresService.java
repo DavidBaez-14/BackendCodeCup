@@ -7,6 +7,8 @@ import org.springframework.transaction.annotation.Transactional;
 import terminus.co.edu.ufps.codecup.analytics.dto.GoleadorDTO;
 import terminus.co.edu.ufps.codecup.analytics.repository.SnapshotGoleadorRepository;
 
+import terminus.co.edu.ufps.codecup.identidad.api.DirectorioPersonas;
+import terminus.co.edu.ufps.codecup.identidad.api.PersonaResumen;
 import java.util.List;
 import java.util.UUID;
 
@@ -15,6 +17,7 @@ import java.util.UUID;
 public class GoleadoresService {
 
     private final SnapshotGoleadorRepository repo;
+    private final DirectorioPersonas directorioPersonas;
 
     @Transactional(readOnly = true)
     public List<GoleadorDTO> obtener(UUID torneoId, int limit) {
@@ -22,8 +25,9 @@ public class GoleadoresService {
                 .stream()
                 .map(s -> GoleadorDTO.builder()
                         .posicion(s.getPosicion())
-                        .cedula(s.getCedula())
-                        .jugadorNombre(s.getJugadorNombre())
+                        .personaId(s.getPersonaId())
+                        .jugadorNombre(directorioPersonas.buscar(s.getPersonaId())
+                                .map(PersonaResumen::nombreVisible).orElse(s.getJugadorNombre()))
                         .equipoNombre(s.getEquipoNombre())
                         .goles(s.getGoles())
                         .build())

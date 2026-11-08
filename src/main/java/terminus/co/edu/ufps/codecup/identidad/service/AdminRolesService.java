@@ -7,7 +7,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import terminus.co.edu.ufps.codecup.identidad.api.Documentos;
 import terminus.co.edu.ufps.codecup.identidad.dto.CuentaRolPendienteDTO;
 import terminus.co.edu.ufps.codecup.identidad.model.Cuenta;
 import terminus.co.edu.ufps.codecup.identidad.model.CuentaRol;
@@ -102,11 +101,11 @@ public class AdminRolesService {
     }
 
     @Transactional
-    public void asignarRol(String cedula, Rol rol, String motivo, UUID callerCuentaId) {
+    public void asignarRol(UUID cuentaId, Rol rol, String motivo, UUID callerCuentaId) {
         if (rol == Rol.JUGADOR) {
             throw ApiException.badRequest("ROL_AUTOMATICO", "El rol JUGADOR se asigna solo al registrarse.");
         }
-        var cuenta = cuentaPorCedula(cedula);
+        var cuenta = cuentaPorId(cuentaId);
         var existente = cuentaRolRepository.findByCuentaIdAndRol(cuenta.getId(), rol);
         if (existente.isPresent() && existente.get().getEstado() == EstadoRol.APROBADO) {
             throw ApiException.conflict("ROL_YA_ASIGNADO", "La cuenta ya tiene el rol " + rol.name() + " aprobado.");
@@ -118,8 +117,8 @@ public class AdminRolesService {
     }
 
     @Transactional
-    public void revocarRol(String cedula, Rol rol, String motivo, UUID callerCuentaId) {
-        var cuenta = cuentaPorCedula(cedula);
+    public void revocarRol(UUID cuentaId, Rol rol, String motivo, UUID callerCuentaId) {
+        var cuenta = cuentaPorId(cuentaId);
         var cr = cuentaRolRepository.findByCuentaIdAndRol(cuenta.getId(), rol)
                 .filter(x -> x.getEstado() == EstadoRol.APROBADO)
                 .orElseThrow(() -> ApiException.notFound("ROL_NO_ASIGNADO",
@@ -144,8 +143,8 @@ public class AdminRolesService {
      * petición suya responde 403 CUENTA_BLOQUEADA.
      */
     @Transactional
-    public void eliminarCuenta(String cedula, String motivo, UUID callerCuentaId) {
-        var cuenta = cuentaPorCedula(cedula);
+    public void eliminarCuenta(UUID cuentaId, String motivo, UUID callerCuentaId) {
+        var cuenta = cuentaPorId(cuentaId);
         if (cuenta.getId().equals(callerCuentaId)) {
             throw ApiException.badRequest("AUTO_BLOQUEO",
                     "No puedes eliminar tu propia cuenta. Pide a otro administrador que lo haga.");
@@ -183,10 +182,10 @@ public class AdminRolesService {
         }
     }
 
-    private Cuenta cuentaPorCedula(String cedula) {
-        return cuentaRepository.findByNumeroDocumento(Documentos.normalizar(cedula))
+    private Cuenta cuentaPorId(UUID cuentaId) {
+        return cuentaRepository.findById(cuentaId)
                 .orElseThrow(() -> ApiException.notFound("CUENTA_NO_ENCONTRADA",
-                        "No existe una cuenta registrada con esa cédula."));
+                        "Cuenta no encontrada."));
     }
 
     private CuentaRolPendienteDTO toPendienteDTO(CuentaRol cr) {
@@ -195,7 +194,7 @@ public class AdminRolesService {
         return CuentaRolPendienteDTO.builder()
                 .id(cr.getId())
                 .cuentaId(cuenta.getId())
-                .cedula(persona != null ? persona.getNumeroDocumento() : null)
+                .numeroDocumento(persona != null ? persona.getNumeroDocumento() : null)
                 .rol(cr.getRol())
                 .estado(cr.getEstado())
                 .fechaSolicitud(cr.getFechaSolicitud())

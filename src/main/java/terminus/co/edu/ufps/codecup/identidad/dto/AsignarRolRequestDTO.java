@@ -1,6 +1,6 @@
 package terminus.co.edu.ufps.codecup.identidad.dto;
 
-import jakarta.validation.constraints.NotBlank;
+import java.util.UUID;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import terminus.co.edu.ufps.codecup.identidad.model.Rol;
@@ -8,12 +8,12 @@ import terminus.co.edu.ufps.codecup.identidad.model.Rol;
 @Data
 public class AsignarRolRequestDTO {
 
-    @NotBlank
-    private String cedula;
+    @NotNull
+    private UUID cuentaId;
 
     @NotNull
     private Rol rol;
 
-    @NotBlank
+    @NotNull
     private String motivo;
 }

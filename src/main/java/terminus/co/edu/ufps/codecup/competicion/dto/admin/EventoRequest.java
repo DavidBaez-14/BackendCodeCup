@@ -8,7 +8,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class EventoRequest {
-    private String cedula;
+    private UUID personaId;
     private UUID equipoTorneoId;
     private String tipoEvento;
 }

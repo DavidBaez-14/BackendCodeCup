@@ -24,6 +24,7 @@ import terminus.co.edu.ufps.codecup.competicion.repository.PartidoRepository;
 import terminus.co.edu.ufps.codecup.competicion.repository.TituloRepository;
 import terminus.co.edu.ufps.codecup.competicion.repository.TorneoRepository;
 import terminus.co.edu.ufps.codecup.finanzas.model.Comprobante;
+import terminus.co.edu.ufps.codecup.identidad.api.DirectorioPersonas;
 import terminus.co.edu.ufps.codecup.finanzas.model.EstadoComprobante;
 import terminus.co.edu.ufps.codecup.finanzas.repository.ComprobanteRepository;
 
@@ -41,6 +42,7 @@ class TorneoAdminServiceComprobanteSyncTest {
     @Mock PartidoRepository partidoRepo;
     @Mock PartidoJugadorRepository partidoJugadorRepo;
     @Mock EventoPartidoRepository eventoPartidoRepo;
+    @Mock DirectorioPersonas directorioPersonas;
     @Mock TituloRepository tituloRepo;
     @InjectMocks TorneoAdminService service;
 
@@ -72,7 +74,7 @@ class TorneoAdminServiceComprobanteSyncTest {
         var comp = comprobantePendiente();
         when(comprobanteRepo.findByReferenciaId(ET)).thenReturn(List.of(comp));
 
-        service.aprobarInscripcion(TORNEO, ET, "admin-1");
+        service.aprobarInscripcion(TORNEO, ET, UUID.randomUUID());
 
         assertThat(comp.getEstado()).isEqualTo(EstadoComprobante.APROBADO);
         verify(comprobanteRepo).save(comp);

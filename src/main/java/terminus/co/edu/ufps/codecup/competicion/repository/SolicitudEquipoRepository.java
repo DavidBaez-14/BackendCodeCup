@@ -15,7 +15,7 @@ public interface SolicitudEquipoRepository extends JpaRepository<SolicitudEquipo
 
     List<SolicitudEquipo> findByEquipoTorneoIdIn(List<UUID> equipoTorneoIds);
 
-    boolean existsByCedulaAndTorneoIdAndEstadoIn(String cedula, UUID torneoId, Collection<EstadoSolicitud> estados);
+    boolean existsByPersonaIdAndTorneoIdAndEstadoIn(UUID personaId, UUID torneoId, Collection<EstadoSolicitud> estados);
 
-    List<SolicitudEquipo> findByCedula(String cedula);
+    List<SolicitudEquipo> findByPersonaId(UUID personaId);
 }

@@ -10,7 +10,9 @@ import java.util.UUID;
 @AllArgsConstructor
 public class SolicitudDTO {
     private UUID id;
-    private String cedula;
+    private UUID personaId;
+    /** Para el delegado que decide y para quien la pidió. */
+    private String numeroDocumento;
     private String nombre;
     private String correo;
     private Integer alturaCm;

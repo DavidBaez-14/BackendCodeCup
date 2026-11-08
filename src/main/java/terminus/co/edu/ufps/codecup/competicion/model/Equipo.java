@@ -22,8 +22,9 @@ public class Equipo {
     @Column(nullable = false, length = 150)
     private String nombre;
 
-    @Column(name = "delegado_cedula", nullable = false, length = 20, unique = true)
-    private String delegadoCedula;
+    /** Persona del delegado (spec 0022). Sin unique: la regla "un equipo base por delegado" vive en DelegadoService. */
+    @Column(name = "delegado_persona_id", nullable = false)
+    private UUID delegadoPersonaId;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

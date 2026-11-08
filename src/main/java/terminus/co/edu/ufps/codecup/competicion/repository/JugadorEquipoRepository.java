@@ -10,12 +10,12 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface JugadorEquipoRepository extends JpaRepository<JugadorEquipo, UUID> {
-    Optional<JugadorEquipo> findByCedulaAndTorneoId(String cedula, UUID torneoId);
-    boolean existsByCedulaAndTorneoId(String cedula, UUID torneoId);
-    List<JugadorEquipo> findByCedulaOrderByFechaInicioDesc(String cedula);
+    Optional<JugadorEquipo> findByPersonaIdAndTorneoId(UUID personaId, UUID torneoId);
+    boolean existsByPersonaIdAndTorneoId(UUID personaId, UUID torneoId);
+    List<JugadorEquipo> findByPersonaIdOrderByFechaInicioDesc(UUID personaId);
     List<JugadorEquipo> findByEquipoTorneoIdOrderByFechaInicioAsc(UUID equipoTorneoId);
 
-    boolean existsByCedulaAndTorneoIdAndEstado(String cedula, UUID torneoId, EstadoMembresia estado);
+    boolean existsByPersonaIdAndTorneoIdAndEstado(UUID personaId, UUID torneoId, EstadoMembresia estado);
     boolean existsByEquipoTorneoIdAndNumeroCamisetaAndEstado(UUID equipoTorneoId, Integer numeroCamiseta, EstadoMembresia estado);
-    Optional<JugadorEquipo> findByCedulaAndEquipoTorneoId(String cedula, UUID equipoTorneoId);
+    Optional<JugadorEquipo> findByPersonaIdAndEquipoTorneoId(UUID personaId, UUID equipoTorneoId);
 }

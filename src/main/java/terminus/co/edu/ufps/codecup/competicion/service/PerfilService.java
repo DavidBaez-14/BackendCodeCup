@@ -5,10 +5,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import terminus.co.edu.ufps.codecup.identidad.api.DirectorioPersonas;
-import terminus.co.edu.ufps.codecup.identidad.api.PersonaResumen;
 import terminus.co.edu.ufps.codecup.competicion.dto.PerfilEquipoDTO;
 import terminus.co.edu.ufps.codecup.competicion.dto.PerfilPartidoDTO;
 import terminus.co.edu.ufps.codecup.competicion.dto.PerfilResponseDTO;
@@ -16,64 +16,43 @@ import terminus.co.edu.ufps.codecup.competicion.dto.PerfilResumenDTO;
 import terminus.co.edu.ufps.codecup.competicion.dto.PerfilTarjetasDTO;
 import terminus.co.edu.ufps.codecup.competicion.dto.PerfilTituloDTO;
 import terminus.co.edu.ufps.codecup.competicion.model.EventoPartido;
-import terminus.co.edu.ufps.codecup.competicion.model.Jugador;
 import terminus.co.edu.ufps.codecup.competicion.model.PartidoJugador;
+import terminus.co.edu.ufps.codecup.competicion.model.PerfilDeportivo;
 import terminus.co.edu.ufps.codecup.competicion.model.TipoEvento;
 import terminus.co.edu.ufps.codecup.competicion.repository.EventoPartidoRepository;
 import terminus.co.edu.ufps.codecup.competicion.repository.JugadorEquipoRepository;
-import terminus.co.edu.ufps.codecup.competicion.repository.JugadorRepository;
 import terminus.co.edu.ufps.codecup.competicion.repository.PartidoJugadorRepository;
+import terminus.co.edu.ufps.codecup.competicion.repository.PerfilDeportivoRepository;
 import terminus.co.edu.ufps.codecup.competicion.repository.TituloRepository;
-
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * "Mi perfil" del jugador: datos deportivos opcionales (spec 0020) y su historial.
+ * Desde la spec 0022 se consulta por persona y el GET ya no crea filas.
+ */
 @Service
 @RequiredArgsConstructor
 public class PerfilService {
 
-    private final JugadorRepository jugadorRepository;
+    private final PerfilDeportivoRepository perfilRepository;
     private final JugadorEquipoRepository jugadorEquipoRepository;
     private final PartidoJugadorRepository partidoJugadorRepository;
     private final EventoPartidoRepository eventoPartidoRepository;
     private final TituloRepository tituloRepository;
     private final DirectorioPersonas directorioPersonas;
 
-    /**
-     * @param nombre fallback si la cedula no es de una persona registrada (viene del JWT)
-     */
-    @Transactional
-    public PerfilResponseDTO obtenerPerfil(String cedula, String nombre, String email) {
-        // El Jugador local guarda datos cosmeticos/deportivos. Si no existe, lo
-        // creamos con nombre/correo: de la persona registrada, del JWT como fallback
-        // (la tabla exige nombre NOT NULL y varias FKs apuntan aqui).
-        var jugador = jugadorRepository.findById(cedula)
-                .orElseGet(() -> {
-                    var persona = directorioPersonas.buscarPorDocumento(cedula).orElse(null);
-                    String nombreLocal = persona != null
-                            ? persona.nombreCompleto()
-                            : (nombre != null && !nombre.isBlank() ? nombre : cedula);
-                    String correoLocal = persona != null && persona.correo() != null
-                            ? persona.correo()
-                            : email;
-                    return jugadorRepository.save(Jugador.builder()
-                            .cedula(cedula)
-                            .nombre(nombreLocal)
-                            .correo(correoLocal)
-                            .build());
-                });
+    @Transactional(readOnly = true)
+    public PerfilResponseDTO obtenerPerfil(UUID personaId) {
+        var persona = directorioPersonas.requerir(personaId);
+        var perfil = perfilRepository.findById(personaId).orElse(null);
 
-        // Nombre a mostrar: apodo > nombre de la persona registrada > nombre del JWT (fallback).
-        String nombreMostrar;
-        if (jugador.getApodo() != null && !jugador.getApodo().isBlank()) {
-            nombreMostrar = jugador.getApodo();
-        } else {
-            nombreMostrar = directorioPersonas.buscarPorDocumento(cedula)
-                    .map(PersonaResumen::nombreCompleto)
-                    .orElse(nombre);
-        }
+        // Nombre a mostrar: apodo > nombre de la persona.
+        String nombreMostrar = perfil != null && perfil.apodoVisible() != null
+                ? perfil.apodoVisible()
+                : persona.nombreCompleto();
 
-        var equipos = jugadorEquipoRepository.findByCedulaOrderByFechaInicioDesc(cedula)
+        var equipos = jugadorEquipoRepository.findByPersonaIdOrderByFechaInicioDesc(personaId)
                 .stream()
                 .map(je -> PerfilEquipoDTO.builder()
                         .id(je.getEquipoTorneo().getEquipo().getId())
@@ -84,14 +63,14 @@ public class PerfilService {
                         .build())
                 .toList();
 
-        var participaciones = partidoJugadorRepository.findByJugadorCedulaAndJugoTrue(cedula);
+        var participaciones = partidoJugadorRepository.findByPersonaIdAndJugoTrue(personaId);
         int goles = participaciones.stream()
                 .map(PartidoJugador::getGoles)
                 .filter(Objects::nonNull)
                 .mapToInt(Integer::intValue)
                 .sum();
 
-        var eventos = eventoPartidoRepository.findByCedula(cedula);
+        var eventos = eventoPartidoRepository.findByPersonaId(personaId);
         var tarjetasPorPartido = new HashMap<UUID, List<String>>();
         int amarillas = 0;
         int azules = 0;
@@ -107,7 +86,7 @@ public class PerfilService {
                     .add(tipo.name());
         }
 
-        var titulos = tituloRepository.findByJugadorCedula(cedula)
+        var titulos = tituloRepository.findByPersonaId(personaId)
                 .stream()
                 .map(t -> PerfilTituloDTO.builder()
                         .torneo(t.getTorneo().getNombre())
@@ -132,11 +111,11 @@ public class PerfilService {
                 .build();
 
         return PerfilResponseDTO.builder()
-                .cedula(jugador.getCedula())
+                .personaId(personaId)
                 .nombre(nombreMostrar)
-                .alturaCm(jugador.getAlturaCm())
-                .piernaHabil(jugador.getPiernaHabil())
-                .posicion(jugador.getPosicion())
+                .alturaCm(perfil != null ? perfil.getAlturaCm() : null)
+                .piernaHabil(perfil != null ? perfil.getPiernaHabil() : null)
+                .posicion(perfil != null ? perfil.getPosicion() : null)
                 .equipos(equipos)
                 .resumen(resumen)
                 .titulos(titulos)
@@ -144,10 +123,9 @@ public class PerfilService {
                 .build();
     }
 
-    private static final java.util.Set<String> PIERNAS_VALIDAS =
-            java.util.Set.of("DERECHA", "IZQUIERDA", "AMBIDIESTRO");
-    private static final java.util.Set<String> POSICIONES_VALIDAS =
-            java.util.Set.of("PORTERO", "DEFENSA", "MEDIOCAMPISTA", "DELANTERO");
+    private static final Set<String> PIERNAS_VALIDAS = Set.of("DERECHA", "IZQUIERDA", "AMBIDIESTRO");
+    private static final Set<String> POSICIONES_VALIDAS =
+            Set.of("PORTERO", "DEFENSA", "MEDIOCAMPISTA", "DELANTERO");
 
     /**
      * Persiste los datos deportivos del jugador desde el tab "Perfil". Los tres
@@ -155,7 +133,7 @@ public class PerfilService {
      * en null (el PUT reemplaza, asi se puede borrar un dato).
      */
     @Transactional
-    public PerfilResponseDTO actualizarPerfilDeportivo(String cedula, String nombreJwt, String emailJwt,
+    public PerfilResponseDTO actualizarPerfilDeportivo(UUID personaId,
                                                        Integer alturaCm, String piernaHabil, String posicion) {
         if (alturaCm != null && (alturaCm < 100 || alturaCm > 250)) {
             throw new RuntimeException("Altura debe estar entre 100 y 250 cm.");
@@ -166,19 +144,16 @@ public class PerfilService {
         if (posicion != null && !POSICIONES_VALIDAS.contains(posicion)) {
             throw new RuntimeException("posicion debe ser PORTERO, DEFENSA, MEDIOCAMPISTA o DELANTERO.");
         }
+        directorioPersonas.requerir(personaId);
 
-        // Reusamos la logica de obtenerPerfil para garantizar la fila local
-        // (nombre/correo del padron, FKs validas, etc.).
-        obtenerPerfil(cedula, nombreJwt, emailJwt);
+        var perfil = perfilRepository.findById(personaId)
+                .orElseGet(() -> PerfilDeportivo.builder().personaId(personaId).build());
+        perfil.setAlturaCm(alturaCm);
+        perfil.setPiernaHabil(piernaHabil);
+        perfil.setPosicion(posicion);
+        perfilRepository.save(perfil);
 
-        var jugador = jugadorRepository.findById(cedula)
-                .orElseThrow(() -> new RuntimeException("Perfil no encontrado para cedula " + cedula));
-        jugador.setAlturaCm(alturaCm);
-        jugador.setPiernaHabil(piernaHabil);
-        jugador.setPosicion(posicion);
-        jugadorRepository.save(jugador);
-
-        return obtenerPerfil(cedula, nombreJwt, emailJwt);
+        return obtenerPerfil(personaId);
     }
 
     private PerfilPartidoDTO toPartidoDTO(PartidoJugador pj, Map<UUID, List<String>> tarjetasPorPartido) {

@@ -28,6 +28,7 @@ import terminus.co.edu.ufps.codecup.finanzas.model.Multa;
 import terminus.co.edu.ufps.codecup.finanzas.model.TipoComprobante;
 import terminus.co.edu.ufps.codecup.finanzas.repository.ComprobanteRepository;
 import terminus.co.edu.ufps.codecup.finanzas.repository.MultaRepository;
+import terminus.co.edu.ufps.codecup.identidad.api.DirectorioPersonas;
 import terminus.co.edu.ufps.codecup.shared.error.ApiException;
 
 /**
@@ -41,9 +42,16 @@ class ComprobanteServiceTest {
     @Mock ComprobanteRepository comprobanteRepo;
     @Mock EquipoTorneoRepository equipoTorneoRepo;
     @Mock MultaRepository multaRepo;
+    @Mock DirectorioPersonas directorioPersonas;
     @InjectMocks ComprobanteService service;
 
     private static final UUID REF = UUID.randomUUID();
+    // Spec 0022: el delegado se identifica por su persona; quien sube y quien resuelve, por su cuenta.
+    private static final UUID DELEGADO_1 = UUID.randomUUID();
+    private static final UUID DELEGADO_A = UUID.randomUUID();
+    private static final UUID DELEGADO_B = UUID.randomUUID();
+    private static final UUID CUENTA_1 = UUID.randomUUID();
+    private static final UUID ADMIN_1 = UUID.randomUUID();
 
     private SubirComprobanteRequest req(String url) {
         var r = new SubirComprobanteRequest();
@@ -53,10 +61,10 @@ class ComprobanteServiceTest {
         return r;
     }
 
-    private EquipoTorneo inscripcion(String delegado, EstadoInscripcion estado) {
+    private EquipoTorneo inscripcion(UUID delegado, EstadoInscripcion estado) {
         var et = new EquipoTorneo();
         et.setId(REF);
-        et.setDelegadoCedula(delegado);
+        et.setDelegadoPersonaId(delegado);
         et.setEstadoInscripcion(estado);
         return et;
     }
@@ -64,19 +72,19 @@ class ComprobanteServiceTest {
     @Test
     void subir_segundaVez_reemplazaMismoComprobante_noCreaOtro() {
         when(equipoTorneoRepo.findById(REF)).thenReturn(
-                Optional.of(inscripcion("delegado-1", EstadoInscripcion.PENDIENTE_PAGO)));
+                Optional.of(inscripcion(DELEGADO_1, EstadoInscripcion.PENDIENTE_PAGO)));
         var existente = Comprobante.builder()
                 .id(UUID.randomUUID())
                 .tipo(TipoComprobante.INSCRIPCION)
                 .referenciaId(REF)
                 .urlArchivo("vieja.jpg")
-                .cedulaUploader("delegado-1")
+                .subidoPorCuentaId(CUENTA_1)
                 .estado(EstadoComprobante.RECHAZADO)
                 .motivoRechazo("borrosa")
                 .build();
         when(comprobanteRepo.findByReferenciaId(REF)).thenReturn(List.of(existente));
 
-        service.subir(req(REF + "/comprobante"), "delegado-1");
+        service.subir(req(REF + "/comprobante"), DELEGADO_1, CUENTA_1);
 
         var captor = ArgumentCaptor.forClass(Comprobante.class);
         verify(comprobanteRepo).save(captor.capture());
@@ -90,10 +98,10 @@ class ComprobanteServiceTest {
     @Test
     void subir_primeraVez_creaComprobanteEnRevisionConFecha() {
         when(equipoTorneoRepo.findById(REF)).thenReturn(
-                Optional.of(inscripcion("delegado-1", EstadoInscripcion.PENDIENTE_PAGO)));
+                Optional.of(inscripcion(DELEGADO_1, EstadoInscripcion.PENDIENTE_PAGO)));
         when(comprobanteRepo.findByReferenciaId(REF)).thenReturn(List.of());
 
-        service.subir(req(REF + "/comprobante"), "delegado-1");
+        service.subir(req(REF + "/comprobante"), DELEGADO_1, CUENTA_1);
 
         var captor = ArgumentCaptor.forClass(Comprobante.class);
         verify(comprobanteRepo).save(captor.capture());
@@ -105,9 +113,9 @@ class ComprobanteServiceTest {
     @Test
     void subir_inscripcionNoPendiente_lanzaError_yNoGuarda() {
         when(equipoTorneoRepo.findById(REF)).thenReturn(
-                Optional.of(inscripcion("delegado-1", EstadoInscripcion.APROBADO)));
+                Optional.of(inscripcion(DELEGADO_1, EstadoInscripcion.APROBADO)));
 
-        assertThatThrownBy(() -> service.subir(req(REF + "/comprobante"), "delegado-1"))
+        assertThatThrownBy(() -> service.subir(req(REF + "/comprobante"), DELEGADO_1, CUENTA_1))
                 .isInstanceOf(IllegalStateException.class);
         verify(comprobanteRepo, never()).save(any());
     }
@@ -117,7 +125,7 @@ class ComprobanteServiceTest {
     private Comprobante comprobante(UUID id, TipoComprobante tipo, UUID ref) {
         return Comprobante.builder()
                 .id(id).tipo(tipo).referenciaId(ref)
-                .cedulaUploader("delegado-1")
+                .subidoPorCuentaId(CUENTA_1)
                 .estado(EstadoComprobante.PENDIENTE_REVISION)
                 .build();
     }
@@ -127,10 +135,10 @@ class ComprobanteServiceTest {
         var compId = UUID.randomUUID();
         var comp = comprobante(compId, TipoComprobante.INSCRIPCION, REF);
         when(comprobanteRepo.findById(compId)).thenReturn(Optional.of(comp));
-        var et = inscripcion("delegado-1", EstadoInscripcion.PENDIENTE_PAGO);
+        var et = inscripcion(DELEGADO_1, EstadoInscripcion.PENDIENTE_PAGO);
         when(equipoTorneoRepo.findById(REF)).thenReturn(Optional.of(et));
 
-        service.aprobar(compId, "admin-1");
+        service.aprobar(compId, ADMIN_1);
 
         assertThat(et.getEstadoInscripcion()).isEqualTo(EstadoInscripcion.APROBADO);
         assertThat(comp.getEstado()).isEqualTo(EstadoComprobante.APROBADO);
@@ -142,9 +150,9 @@ class ComprobanteServiceTest {
         var comp = comprobante(compId, TipoComprobante.INSCRIPCION, REF);
         when(comprobanteRepo.findById(compId)).thenReturn(Optional.of(comp));
         when(equipoTorneoRepo.findById(REF)).thenReturn(
-                Optional.of(inscripcion("delegado-1", EstadoInscripcion.APROBADO)));
+                Optional.of(inscripcion(DELEGADO_1, EstadoInscripcion.APROBADO)));
 
-        assertThatThrownBy(() -> service.aprobar(compId, "admin-1"))
+        assertThatThrownBy(() -> service.aprobar(compId, ADMIN_1))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(comp.getEstado()).isEqualTo(EstadoComprobante.PENDIENTE_REVISION); // sin cambios
     }
@@ -160,7 +168,7 @@ class ComprobanteServiceTest {
         multa.setEstado(EstadoMulta.PENDIENTE);
         when(multaRepo.findById(multaId)).thenReturn(Optional.of(multa));
 
-        service.aprobar(compId, "admin-1");
+        service.aprobar(compId, ADMIN_1);
 
         assertThat(multa.getEstado()).isEqualTo(EstadoMulta.PAGADA);
         assertThat(multa.getFechaPago()).isNotNull();
@@ -181,9 +189,9 @@ class ComprobanteServiceTest {
         multa.setEstado(EstadoMulta.PENDIENTE);
         when(multaRepo.findById(multaId)).thenReturn(Optional.of(multa));
         when(equipoTorneoRepo.findById(etId)).thenReturn(
-                Optional.of(inscripcion("delegado-A", EstadoInscripcion.PENDIENTE_PAGO)));
+                Optional.of(inscripcion(DELEGADO_A, EstadoInscripcion.PENDIENTE_PAGO)));
 
-        assertThatThrownBy(() -> service.subir(r, "delegado-B"))
+        assertThatThrownBy(() -> service.subir(r, DELEGADO_B, CUENTA_1))
                 .isInstanceOf(RuntimeException.class);
         verify(comprobanteRepo, never()).save(any());
     }
@@ -203,11 +211,11 @@ class ComprobanteServiceTest {
         multa.setEquipoTorneoId(etId);
         multa.setEstado(EstadoMulta.PENDIENTE);
         when(multaRepo.findById(multaId)).thenReturn(Optional.of(multa));
-        var et = inscripcion("delegado-A", EstadoInscripcion.APROBADO);
+        var et = inscripcion(DELEGADO_A, EstadoInscripcion.APROBADO);
         et.setId(etId);
         when(equipoTorneoRepo.findById(etId)).thenReturn(Optional.of(et));
 
-        assertThatThrownBy(() -> service.subir(r, "delegado-A"))
+        assertThatThrownBy(() -> service.subir(r, DELEGADO_A, CUENTA_1))
                 .isInstanceOf(ApiException.class)
                 .extracting("code").isEqualTo("ARCHIVO_AJENO");
         verify(comprobanteRepo, never()).save(any());
@@ -216,9 +224,9 @@ class ComprobanteServiceTest {
     @Test
     void subir_conSaltoDeRuta_lanza403ArchivoAjeno() {
         when(equipoTorneoRepo.findById(REF)).thenReturn(
-                Optional.of(inscripcion("delegado-1", EstadoInscripcion.PENDIENTE_PAGO)));
+                Optional.of(inscripcion(DELEGADO_1, EstadoInscripcion.PENDIENTE_PAGO)));
 
-        assertThatThrownBy(() -> service.subir(req(REF + "/../otro/comprobante"), "delegado-1"))
+        assertThatThrownBy(() -> service.subir(req(REF + "/../otro/comprobante"), DELEGADO_1, CUENTA_1))
                 .isInstanceOf(ApiException.class)
                 .extracting("code").isEqualTo("ARCHIVO_AJENO");
         verify(comprobanteRepo, never()).save(any());

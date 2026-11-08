@@ -25,8 +25,8 @@ public class PremioAsignado {
     @Column(name = "premio_id", nullable = false)
     private UUID premioId;
 
-    @Column(length = 20)
-    private String cedula;
+    @Column(name = "persona_id")
+    private UUID personaId;
 
     @Column(name = "equipo_torneo_id")
     private UUID equipoTorneoId;

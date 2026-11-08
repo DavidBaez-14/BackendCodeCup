@@ -18,4 +18,16 @@ public final class JwtClaims {
         }
         return UUID.fromString(valor);
     }
+
+    /**
+     * Persona de quien llama (spec 0022): la llave de la competición y las finanzas.
+     * 404 CUENTA_NO_REGISTRADA si aún no se registró (toda cuenta registrada tiene persona).
+     */
+    public static UUID personaId(Jwt jwt) {
+        String valor = jwt.getClaimAsString(SupabaseJwtConverter.CLAIM_PERSONA_ID);
+        if (valor == null) {
+            throw ApiException.notFound("CUENTA_NO_REGISTRADA", "Completa tu registro en CodeCup para continuar.");
+        }
+        return UUID.fromString(valor);
+    }
 }

@@ -1,5 +1,7 @@
 package terminus.co.edu.ufps.codecup.identidad.repository;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -22,6 +24,12 @@ public interface CuentaRepository extends JpaRepository<Cuenta, UUID> {
     Optional<Cuenta> findByNumeroDocumento(@Param("numero") String numeroDocumento);
 
     Optional<Cuenta> findByPersonaId(UUID personaId);
+
+    List<Cuenta> findByPersonaIdIn(Collection<UUID> personaIds);
+
+    /** Para mostrar el nombre de quien hizo una acción (aprobó, pagó, subió…): trae la persona de una vez. */
+    @Query("SELECT c FROM Cuenta c LEFT JOIN FETCH c.persona WHERE c.id IN :ids")
+    List<Cuenta> findConPersonaByIdIn(@Param("ids") Collection<UUID> ids);
 
     Optional<Cuenta> findFirstByCorreo(String correo);
 

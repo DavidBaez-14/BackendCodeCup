@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import terminus.co.edu.ufps.codecup.competicion.dto.PerfilResponseDTO;
 import terminus.co.edu.ufps.codecup.competicion.dto.PerfilUpdateRequestDTO;
 import terminus.co.edu.ufps.codecup.competicion.service.PerfilService;
+import terminus.co.edu.ufps.codecup.shared.security.JwtClaims;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -26,13 +27,7 @@ public class PerfilController {
     @GetMapping("/mi-perfil")
     @PreAuthorize("hasRole('JUGADOR')")
     public ResponseEntity<PerfilResponseDTO> miPerfil(@AuthenticationPrincipal Jwt jwt) {
-        String cedula = jwt.getClaimAsString("cedula");
-        if (cedula == null || cedula.isBlank()) {
-            throw new RuntimeException("Token sin cedula.");
-        }
-        String nombre = jwt.getClaimAsString("nombre");
-        String email = jwt.getClaimAsString("email");
-        return ResponseEntity.ok(perfilService.obtenerPerfil(cedula, nombre, email));
+        return ResponseEntity.ok(perfilService.obtenerPerfil(JwtClaims.personaId(jwt)));
     }
 
     @PutMapping("/mi-perfil")
@@ -40,13 +35,7 @@ public class PerfilController {
     public ResponseEntity<PerfilResponseDTO> actualizarMiPerfil(
             @Valid @RequestBody PerfilUpdateRequestDTO req,
             @AuthenticationPrincipal Jwt jwt) {
-        String cedula = jwt.getClaimAsString("cedula");
-        if (cedula == null || cedula.isBlank()) {
-            throw new RuntimeException("Token sin cedula.");
-        }
-        String nombre = jwt.getClaimAsString("nombre");
-        String email = jwt.getClaimAsString("email");
         return ResponseEntity.ok(perfilService.actualizarPerfilDeportivo(
-                cedula, nombre, email, req.getAlturaCm(), req.getPiernaHabil(), req.getPosicion()));
+                JwtClaims.personaId(jwt), req.getAlturaCm(), req.getPiernaHabil(), req.getPosicion()));
     }
 }

@@ -29,7 +29,6 @@ public class ConsultaCuentas {
                     cuenta.getId(),
                     persona != null ? persona.getId() : null,
                     persona != null ? persona.nombreCompleto() : null,
-                    persona != null ? persona.getNumeroDocumento() : null,
                     cuenta.getEstado() == EstadoCuenta.BLOQUEADA,
                     roles);
         });

@@ -8,7 +8,7 @@ public record CuentaAutenticada(
         UUID cuentaId,
         UUID personaId,
         String nombre,
-        String numeroDocumento,
+
         boolean bloqueada,
         List<String> roles) {
 }

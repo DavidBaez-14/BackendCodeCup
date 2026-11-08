@@ -9,7 +9,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface PartidoJugadorRepository extends JpaRepository<PartidoJugador, UUID> {
-    List<PartidoJugador> findByJugadorCedulaAndJugoTrue(String cedula);
-    Optional<PartidoJugador> findByPartidoIdAndJugadorCedula(UUID partidoId, String cedula);
+    List<PartidoJugador> findByPersonaIdAndJugoTrue(UUID personaId);
+    Optional<PartidoJugador> findByPartidoIdAndPersonaId(UUID partidoId, UUID personaId);
     List<PartidoJugador> findByPartidoId(UUID partidoId);
 }

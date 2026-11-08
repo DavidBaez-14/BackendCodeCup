@@ -13,15 +13,15 @@ import java.util.UUID;
 @AllArgsConstructor
 @Entity
 @Table(name = "jugador_equipo", schema = "competicion",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"cedula", "torneo_id"}))
+        uniqueConstraints = @UniqueConstraint(columnNames = {"persona_id", "torneo_id"}))
 public class JugadorEquipo {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(nullable = false, length = 20)
-    private String cedula;
+    @Column(name = "persona_id", nullable = false)
+    private UUID personaId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "torneo_id", nullable = false)

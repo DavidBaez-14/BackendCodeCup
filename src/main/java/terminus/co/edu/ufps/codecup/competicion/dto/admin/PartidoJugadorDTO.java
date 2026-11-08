@@ -10,7 +10,9 @@ import java.util.UUID;
 @AllArgsConstructor
 public class PartidoJugadorDTO {
     private UUID id;
-    private String cedula;
+    private UUID personaId;
+    /** Para el árbitro y el admin, que verifican la identidad en la cancha. */
+    private String numeroDocumento;
     private String jugadorNombre;
     private UUID equipoTorneoId;
     private String equipoNombre;

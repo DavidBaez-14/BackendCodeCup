@@ -19,8 +19,9 @@ import org.hibernate.annotations.CreationTimestamp;
 
 /**
  * La persona del mundo real, separada de la cuenta con la que inicia sesión.
- * El documento es opcional en el modelo. Mientras la competición use la cédula
- * como llave (hasta M2), el registro lo exige y el número no se repite.
+ * Es la llave de la competición (spec 0022): plantel, partidos, multas… apuntan a su id.
+ * Puede no tener cuenta: un miembro que el delegado agregó y que aún no se registró.
+ * El documento es opcional en el modelo; el número no se repite aunque cambie el tipo.
  */
 @Data
 @Builder
@@ -36,7 +37,7 @@ public class Persona {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(nullable = false, length = 100)
+    @Column(nullable = false, length = 150)
     private String nombres;
 
     @Column(length = 100)

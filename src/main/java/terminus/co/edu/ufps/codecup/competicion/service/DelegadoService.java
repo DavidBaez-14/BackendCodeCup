@@ -18,15 +18,19 @@ import terminus.co.edu.ufps.codecup.competicion.dto.delegado.MiembroEquipoDTO;
 import terminus.co.edu.ufps.codecup.competicion.dto.delegado.TorneoDisponibleDTO;
 import terminus.co.edu.ufps.codecup.competicion.model.*;
 import terminus.co.edu.ufps.codecup.competicion.repository.*;
-import terminus.co.edu.ufps.codecup.finanzas.model.EstadoComprobante;
-import terminus.co.edu.ufps.codecup.finanzas.model.TipoComprobante;
 import terminus.co.edu.ufps.codecup.finanzas.repository.ComprobanteRepository;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Lo que hace el delegado con su equipo. Desde la spec 0022 el delegado y los miembros
+ * se identifican por {@code persona_id}; el documento solo sirve para encontrar o crear
+ * a la persona al agregarla al plantel.
+ */
 @Service
 @RequiredArgsConstructor
 public class DelegadoService {
@@ -35,17 +39,17 @@ public class DelegadoService {
     private final TorneoRepository torneoRepo;
     private final EquipoTorneoRepository equipoTorneoRepo;
     private final JugadorEquipoRepository jugadorEquipoRepo;
-    private final JugadorRepository jugadorRepo;
+    private final PerfilDeportivoRepository perfilRepo;
     private final TorneoAdminService torneoAdminService;
     private final DirectorioPersonas directorioPersonas;
     private final ComprobanteRepository comprobanteRepo;
 
     @Transactional(readOnly = true)
-    public InscripcionInfoDTO obtenerInscripcionInfo(String delegadoCedula, UUID torneoId) {
+    public InscripcionInfoDTO obtenerInscripcionInfo(UUID delegadoPersonaId, UUID torneoId) {
         var torneo = torneoRepo.findById(torneoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Torneo no encontrado."));
 
-        var et = equipoTorneoRepo.findByTorneoIdAndDelegadoCedula(torneoId, delegadoCedula)
+        var et = equipoTorneoRepo.findByTorneoIdAndDelegadoPersonaId(torneoId, delegadoPersonaId)
                 .orElse(null);
 
         String estadoComprobante = null;
@@ -67,16 +71,14 @@ public class DelegadoService {
     }
 
     @Transactional
-    public EquipoDTO crearEquipo(String delegadoCedula, CrearEquipoRequest req) {
+    public EquipoDTO crearEquipo(UUID delegadoPersonaId, CrearEquipoRequest req) {
         if (req.getNombre() == null || req.getNombre().isBlank()) {
             throw new RuntimeException("El nombre del equipo es obligatorio.");
         }
-        // Garantiza la fila local de jugador (con nombre de la persona registrada) ANTES
-        // de crear el equipo: la tabla equipos tiene FK a jugadores.
-        garantizarJugadorLocal(delegadoCedula);
+        directorioPersonas.requerir(delegadoPersonaId);
 
         // Un delegado solo puede tener un equipo base.
-        var existente = equipoRepo.findByDelegadoCedula(delegadoCedula);
+        var existente = equipoRepo.findByDelegadoPersonaId(delegadoPersonaId);
         if (existente.isPresent()) {
             throw new RuntimeException("Ya tienes un equipo creado: \""
                     + existente.get().getNombre() + "\". No puedes crear otro.");
@@ -84,45 +86,25 @@ public class DelegadoService {
 
         var equipo = Equipo.builder()
                 .nombre(req.getNombre().trim())
-                .delegadoCedula(delegadoCedula)
+                .delegadoPersonaId(delegadoPersonaId)
                 .build();
         equipoRepo.save(equipo);
         return EquipoDTO.builder().id(equipo.getId()).nombre(equipo.getNombre()).build();
     }
 
-    /**
-     * Garantiza una fila local en competicion.jugadores para la cedula dada.
-     * Si no existe, la crea copiando nombre y correo de la persona registrada
-     * (identidad.personas). Si nadie se registro con esa cedula, lanza error:
-     * nunca queremos jugadores locales con nombre vacio (la tabla lo exige
-     * NOT NULL y el frontend muestra el nombre en estadisticas/eventos).
-     */
-    private Jugador garantizarJugadorLocal(String cedula) {
-        return jugadorRepo.findById(cedula).orElseGet(() -> {
-            var persona = directorioPersonas.buscarPorDocumento(cedula)
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "La cedula " + cedula + " no corresponde a ninguna persona registrada en CodeCup."));
-            return jugadorRepo.save(Jugador.builder()
-                    .cedula(cedula)
-                    .nombre(persona.nombreCompleto())
-                    .correo(persona.correo())
-                    .build());
-        });
-    }
-
     @Transactional(readOnly = true)
-    public EquipoDTO miEquipo(String delegadoCedula) {
-        var equipo = equipoRepo.findByDelegadoCedula(delegadoCedula)
+    public EquipoDTO miEquipo(UUID delegadoPersonaId) {
+        var equipo = equipoRepo.findByDelegadoPersonaId(delegadoPersonaId)
                 .orElseThrow(() -> new ResourceNotFoundException("Aun no has creado tu equipo."));
         return EquipoDTO.builder().id(equipo.getId()).nombre(equipo.getNombre()).build();
     }
 
     @Transactional(readOnly = true)
-    public List<TorneoDisponibleDTO> torneosDisponibles(String delegadoCedula) {
+    public List<TorneoDisponibleDTO> torneosDisponibles(UUID delegadoPersonaId) {
         var publicados = torneoRepo.findByEstadoInOrderByEdicionDesc(
                 List.of(EstadoTorneo.PUBLICADO, EstadoTorneo.EN_CURSO));
         return publicados.stream().map(t -> {
-            var inscripcion = equipoTorneoRepo.findByTorneoIdAndDelegadoCedula(t.getId(), delegadoCedula);
+            var inscripcion = equipoTorneoRepo.findByTorneoIdAndDelegadoPersonaId(t.getId(), delegadoPersonaId);
             return TorneoDisponibleDTO.builder()
                     .id(t.getId())
                     .nombre(t.getNombre())
@@ -139,18 +121,18 @@ public class DelegadoService {
     }
 
     @Transactional
-    public InscripcionDTO inscribir(String delegadoCedula, UUID torneoId) {
+    public InscripcionDTO inscribir(UUID delegadoPersonaId, UUID torneoId) {
         var torneo = torneoRepo.findById(torneoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Torneo no encontrado."));
         if (torneo.getEstado() != EstadoTorneo.PUBLICADO) {
             throw new RuntimeException("Solo se puede inscribir a torneos PUBLICADOS.");
         }
 
-        var equipoDto = miEquipo(delegadoCedula);
+        var equipoDto = miEquipo(delegadoPersonaId);
         var equipo = equipoRepo.findById(equipoDto.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Equipo no encontrado."));
 
-        if (equipoTorneoRepo.findByTorneoIdAndDelegadoCedula(torneoId, delegadoCedula).isPresent()) {
+        if (equipoTorneoRepo.findByTorneoIdAndDelegadoPersonaId(torneoId, delegadoPersonaId).isPresent()) {
             throw new RuntimeException("Ya tienes una inscripcion para este torneo.");
         }
         if (equipoTorneoRepo.findByTorneoIdAndEquipoId(torneoId, equipo.getId()).isPresent()) {
@@ -160,29 +142,27 @@ public class DelegadoService {
         var et = EquipoTorneo.builder()
                 .torneo(torneo)
                 .equipo(equipo)
-                .delegadoCedula(delegadoCedula)
+                .delegadoPersonaId(delegadoPersonaId)
                 .estadoInscripcion(EstadoInscripcion.PENDIENTE_PAGO)
                 .build();
         equipoTorneoRepo.save(et);
 
-        // Auto-inscribir al delegado como jugador con snapshot de su persona registrada.
-        if (!jugadorEquipoRepo.existsByCedulaAndTorneoId(delegadoCedula, torneoId)) {
-            var persona = directorioPersonas.buscarPorDocumento(delegadoCedula)
+        // Auto-inscribir al delegado como jugador, con snapshot de su persona.
+        // El perfil deportivo es opcional (spec 0020): lo que falte queda en null.
+        if (!jugadorEquipoRepo.existsByPersonaIdAndTorneoId(delegadoPersonaId, torneoId)) {
+            var persona = directorioPersonas.buscar(delegadoPersonaId)
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "El delegado no tiene una persona registrada en CodeCup."));
-            // jugador_equipo.cedula tiene FK a jugadores, asi que garantizamos
-            // la fila local antes de insertar JugadorEquipo.
-            // El perfil deportivo es opcional (spec 0020): lo que falte queda en null.
-            var jugadorLocal = garantizarJugadorLocal(delegadoCedula);
+            var perfil = perfilRepo.findById(delegadoPersonaId).orElse(null);
             var je = JugadorEquipo.builder()
-                    .cedula(delegadoCedula)
+                    .personaId(delegadoPersonaId)
                     .torneo(torneo)
                     .equipoTorneo(et)
                     .fechaInicio(LocalDate.now())
                     .estado(EstadoMembresia.ACTIVO)
-                    .alturaCmSnapshot(jugadorLocal.getAlturaCm())
-                    .piernaHabilSnapshot(jugadorLocal.getPiernaHabil())
-                    .posicionSnapshot(jugadorLocal.getPosicion())
+                    .alturaCmSnapshot(perfil != null ? perfil.getAlturaCm() : null)
+                    .piernaHabilSnapshot(perfil != null ? perfil.getPiernaHabil() : null)
+                    .posicionSnapshot(perfil != null ? perfil.getPosicion() : null)
                     .build();
             poblarSnapshots(je, persona.nombreCompleto());
             jugadorEquipoRepo.save(je);
@@ -192,8 +172,8 @@ public class DelegadoService {
     }
 
     @Transactional(readOnly = true)
-    public List<InscripcionDTO> misInscripciones(String delegadoCedula) {
-        return equipoTorneoRepo.findByDelegadoCedulaOrderByFechaInscripcionDesc(delegadoCedula)
+    public List<InscripcionDTO> misInscripciones(UUID delegadoPersonaId) {
+        return equipoTorneoRepo.findByDelegadoPersonaIdOrderByFechaInscripcionDesc(delegadoPersonaId)
                 .stream()
                 .map(torneoAdminService::toInscripcionDTO)
                 .toList();
@@ -207,41 +187,35 @@ public class DelegadoService {
     // ─────────────────────────────────────────────────────────
 
     @Transactional
-    public MiembroEquipoDTO agregarMiembro(String delegadoCedula, UUID equipoTorneoId,
+    public MiembroEquipoDTO agregarMiembro(UUID delegadoPersonaId, UUID equipoTorneoId,
                                             AgregarMiembroRequest req) {
-        var et = equipoTorneoRepo.findById(equipoTorneoId)
-                .orElseThrow(() -> new ResourceNotFoundException("Inscripcion no encontrada."));
-        if (!et.getDelegadoCedula().equals(delegadoCedula)) {
-            throw new RuntimeException("No eres el delegado de esta inscripcion.");
-        }
+        var et = inscripcionDelDelegado(delegadoPersonaId, equipoTorneoId);
 
         // Spec 0018: el documento se normaliza igual que en el registro, para que
-        // "1.090 123" y "1090123" sean el mismo jugador y no dos.
-        String cedula = normalizarDocumento(req.getCedula());
-        var persona = directorioPersonas.buscarPorDocumento(cedula).orElse(null);
+        // "1.090 123" y "1090123" sean la misma persona y no dos.
+        String documento = normalizarDocumento(req.getNumeroDocumento());
+        var persona = directorioPersonas.buscarPorDocumento(documento).orElse(null);
         if (persona != null && persona.cuentaBloqueada()) {
             throw jugadorBloqueado();
         }
 
-        // La persona puede no tener cuenta. El nombre: el de la persona registrada
-        // (lo decide ella); si no, el que escribe el delegado; si no, el que ya
-        // tenia de otro torneo.
-        var jugadorLocal = jugadorRepo.findById(cedula).orElse(null);
+        // El nombre: el de la persona registrada (lo decide ella); si no tiene cuenta,
+        // el que escribe el delegado; si no, el que ya tenía de otro torneo.
         String nombreEnviado = limpiarNombre(req.getNombre());
         String nombre;
-        if (persona != null) {
+        if (persona != null && persona.tieneCuenta()) {
             nombre = persona.nombreCompleto();
         } else if (nombreEnviado != null) {
             nombre = nombreEnviado;
-        } else if (jugadorLocal != null) {
-            nombre = jugadorLocal.getNombre();
+        } else if (persona != null) {
+            nombre = persona.nombreCompleto();
         } else {
             throw ApiException.badRequest("NOMBRE_REQUERIDO",
                     "Esta persona aun no tiene cuenta en CodeCup: escribe su nombre completo.");
         }
 
-        if (jugadorEquipoRepo.existsByCedulaAndTorneoIdAndEstado(
-                cedula, et.getTorneo().getId(), EstadoMembresia.ACTIVO)) {
+        if (persona != null && jugadorEquipoRepo.existsByPersonaIdAndTorneoIdAndEstado(
+                persona.personaId(), et.getTorneo().getId(), EstadoMembresia.ACTIVO)) {
             throw new RuntimeException("El jugador ya pertenece a un equipo en este torneo.");
         }
 
@@ -253,16 +227,14 @@ public class DelegadoService {
             }
         }
 
-        // Fila local del jugador (nombre NOT NULL y varias FKs apuntan aqui). Si ya
-        // existia no se renombra: el nombre de este torneo vive en el snapshot.
-        var jugador = jugadorLocal != null ? jugadorLocal : jugadorRepo.save(Jugador.builder()
-                .cedula(cedula)
-                .nombre(nombre)
-                .correo(persona != null ? persona.correo() : null)
-                .build());
+        // Spec 0022: quien no existía pasa a ser una persona sin cuenta. Si ya existía,
+        // no se renombra: el nombre de este torneo vive en el snapshot (0018, criterio 4).
+        if (persona == null) {
+            persona = directorioPersonas.registrarSinCuenta(nombre, req.getTipoDocumento(), documento);
+        }
 
-        var existente = jugadorEquipoRepo.findByCedulaAndTorneoId(
-                cedula, et.getTorneo().getId());
+        var existente = jugadorEquipoRepo.findByPersonaIdAndTorneoId(
+                persona.personaId(), et.getTorneo().getId());
 
         JugadorEquipo je;
         if (existente.isPresent()) {
@@ -276,7 +248,7 @@ public class DelegadoService {
             }
         } else {
             je = JugadorEquipo.builder()
-                    .cedula(jugador.getCedula())
+                    .personaId(persona.personaId())
                     .torneo(et.getTorneo())
                     .equipoTorneo(et)
                     .fechaInicio(LocalDate.now())
@@ -288,19 +260,19 @@ public class DelegadoService {
         poblarSnapshots(je, nombre);
         jugadorEquipoRepo.save(je);
 
-        return toMiembroDTO(je, jugador, et);
+        return toMiembroDTO(je, persona, et);
     }
 
     /** Mismo criterio que el registro (identidad); vacio o mas largo que la columna = 400 VALIDACION. */
     private static String normalizarDocumento(String documento) {
-        String cedula = Documentos.normalizar(documento);
-        if (cedula == null) {
+        String numero = Documentos.normalizar(documento);
+        if (numero == null) {
             throw ApiException.badRequest("VALIDACION", "El documento es obligatorio.");
         }
-        if (cedula.length() > 20) {
+        if (numero.length() > 20) {
             throw ApiException.badRequest("VALIDACION", "El documento no puede tener más de 20 caracteres.");
         }
-        return cedula;
+        return numero;
     }
 
     /** Sin espacios al inicio ni al final; vacio = no enviado. */
@@ -317,41 +289,31 @@ public class DelegadoService {
     }
 
     @Transactional
-    public MiembroEquipoDTO removerMiembro(String delegadoCedula, UUID equipoTorneoId, String cedula) {
-        var et = equipoTorneoRepo.findById(equipoTorneoId)
-                .orElseThrow(() -> new ResourceNotFoundException("Inscripcion no encontrada."));
-        if (!et.getDelegadoCedula().equals(delegadoCedula)) {
-            throw new RuntimeException("No eres el delegado de esta inscripcion.");
-        }
+    public MiembroEquipoDTO removerMiembro(UUID delegadoPersonaId, UUID equipoTorneoId, UUID personaId) {
+        var et = inscripcionDelDelegado(delegadoPersonaId, equipoTorneoId);
 
-        var je = jugadorEquipoRepo.findByCedulaAndEquipoTorneoId(cedula, equipoTorneoId)
+        var je = jugadorEquipoRepo.findByPersonaIdAndEquipoTorneoId(personaId, equipoTorneoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Jugador no encontrado en el plantel."));
 
-        if (je.getCedula().equals(et.getDelegadoCedula())) {
+        if (je.getPersonaId().equals(et.getDelegadoPersonaId())) {
             throw new RuntimeException("No puedes eliminar al delegado del plantel.");
         }
 
-        if (je.getEstado() == EstadoMembresia.RETIRADO) {
-            return toMiembroDTO(je, jugadorRepo.findById(cedula).orElse(null), et);
+        if (je.getEstado() != EstadoMembresia.RETIRADO) {
+            je.setEstado(EstadoMembresia.RETIRADO);
+            je.setFechaFin(LocalDate.now());
+            jugadorEquipoRepo.save(je);
         }
 
-        je.setEstado(EstadoMembresia.RETIRADO);
-        je.setFechaFin(LocalDate.now());
-        jugadorEquipoRepo.save(je);
-
-        return toMiembroDTO(je, jugadorRepo.findById(cedula).orElse(null), et);
+        return toMiembroDTO(je, directorioPersonas.buscar(personaId).orElse(null), et);
     }
 
     @Transactional
-    public MiembroEquipoDTO actualizarCamiseta(String delegadoCedula, UUID equipoTorneoId,
-                                                String cedula, Integer numeroCamiseta) {
-        var et = equipoTorneoRepo.findById(equipoTorneoId)
-                .orElseThrow(() -> new ResourceNotFoundException("Inscripcion no encontrada."));
-        if (!et.getDelegadoCedula().equals(delegadoCedula)) {
-            throw new RuntimeException("No eres el delegado de esta inscripcion.");
-        }
+    public MiembroEquipoDTO actualizarCamiseta(UUID delegadoPersonaId, UUID equipoTorneoId,
+                                                UUID personaId, Integer numeroCamiseta) {
+        var et = inscripcionDelDelegado(delegadoPersonaId, equipoTorneoId);
 
-        var je = jugadorEquipoRepo.findByCedulaAndEquipoTorneoId(cedula, equipoTorneoId)
+        var je = jugadorEquipoRepo.findByPersonaIdAndEquipoTorneoId(personaId, equipoTorneoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Jugador no encontrado en el plantel."));
 
         if (numeroCamiseta != null) {
@@ -361,7 +323,7 @@ public class DelegadoService {
                     .filter(j -> j.getEstado() == EstadoMembresia.ACTIVO
                             && j.getNumeroCamiseta() != null
                             && j.getNumeroCamiseta().equals(numeroCamiseta)
-                            && !j.getCedula().equals(cedula))
+                            && !j.getPersonaId().equals(personaId))
                     .findAny();
             if (ocupado.isPresent()) {
                 throw new RuntimeException(
@@ -372,36 +334,44 @@ public class DelegadoService {
         je.setNumeroCamiseta(numeroCamiseta);
         jugadorEquipoRepo.save(je);
 
-        return toMiembroDTO(je, jugadorRepo.findById(cedula).orElse(null), et);
+        return toMiembroDTO(je, directorioPersonas.buscar(personaId).orElse(null), et);
     }
 
     @Transactional(readOnly = true)
-    public List<MiembroEquipoDTO> miembros(String delegadoCedula, UUID equipoTorneoId) {
-        var et = equipoTorneoRepo.findById(equipoTorneoId)
-                .orElseThrow(() -> new ResourceNotFoundException("Inscripcion no encontrada."));
-        if (!et.getDelegadoCedula().equals(delegadoCedula)) {
-            throw new RuntimeException("No eres el delegado de esta inscripcion.");
-        }
-        return jugadorEquipoRepo.findByEquipoTorneoIdOrderByFechaInicioAsc(equipoTorneoId)
-                .stream()
-                .map(je -> toMiembroDTO(je, jugadorRepo.findById(je.getCedula()).orElse(null), et))
-                .toList();
+    public List<MiembroEquipoDTO> miembros(UUID delegadoPersonaId, UUID equipoTorneoId) {
+        var et = inscripcionDelDelegado(delegadoPersonaId, equipoTorneoId);
+        return miembrosDe(et);
     }
 
     @Transactional(readOnly = true)
     public List<MiembroEquipoDTO> miembrosAdmin(UUID equipoTorneoId) {
         var et = equipoTorneoRepo.findById(equipoTorneoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Inscripcion no encontrada."));
-        return jugadorEquipoRepo.findByEquipoTorneoIdOrderByFechaInicioAsc(equipoTorneoId)
-                .stream()
-                .map(je -> toMiembroDTO(je, jugadorRepo.findById(je.getCedula()).orElse(null), et))
+        return miembrosDe(et);
+    }
+
+    private List<MiembroEquipoDTO> miembrosDe(EquipoTorneo et) {
+        var plantel = jugadorEquipoRepo.findByEquipoTorneoIdOrderByFechaInicioAsc(et.getId());
+        Map<UUID, PersonaResumen> personas = directorioPersonas.buscarVarias(
+                plantel.stream().map(JugadorEquipo::getPersonaId).toList());
+        return plantel.stream()
+                .map(je -> toMiembroDTO(je, personas.get(je.getPersonaId()), et))
                 .toList();
     }
 
+    private EquipoTorneo inscripcionDelDelegado(UUID delegadoPersonaId, UUID equipoTorneoId) {
+        var et = equipoTorneoRepo.findById(equipoTorneoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Inscripcion no encontrada."));
+        if (!et.getDelegadoPersonaId().equals(delegadoPersonaId)) {
+            throw new RuntimeException("No eres el delegado de esta inscripcion.");
+        }
+        return et;
+    }
+
     /**
-     * Snapshot del nombre en este torneo: el registro historico, y el unico nombre
-     * de quien no tiene cuenta. Sin padron ya no hay datos academicos (semestre,
-     * rol academico): esos snapshots quedan vacios. Los llenara el CSV de informes (M5).
+     * Snapshot del nombre en este torneo: el registro historico, y el nombre que usa
+     * quien no tiene cuenta. Sin padron ya no hay datos academicos (semestre, rol
+     * academico): esos snapshots quedan vacios. Los llenara el CSV de informes (M5).
      */
     private void poblarSnapshots(JugadorEquipo je, String nombre) {
         je.setNombreSnapshot(nombre);
@@ -411,33 +381,34 @@ public class DelegadoService {
     /**
      * Construye el DTO del miembro. Prioridad para el nombre (spec 0018):
      *   1. apodo (cosmetico, opt-in del jugador)
-     *   2. la persona registrada: el nombre lo decide ella
+     *   2. la persona registrada (con cuenta): el nombre lo decide ella
      *   3. snapshot del torneo (lo que escribio el delegado si no tiene cuenta)
-     *   4. el nombre guardado del jugador local (filas viejas sin snapshot)
+     *   4. el nombre de la persona sin cuenta (filas viejas sin snapshot)
      */
-    private MiembroEquipoDTO toMiembroDTO(JugadorEquipo je, Jugador jugador, EquipoTorneo et) {
-        PersonaResumen persona = directorioPersonas.buscarPorDocumento(je.getCedula()).orElse(null);
+    private MiembroEquipoDTO toMiembroDTO(JugadorEquipo je, PersonaResumen persona, EquipoTorneo et) {
+        var perfil = perfilRepo.findById(je.getPersonaId()).orElse(null);
         String nombre;
-        if (jugador != null && jugador.getApodo() != null && !jugador.getApodo().isBlank()) {
-            nombre = jugador.getApodo();
-        } else if (persona != null) {
+        if (perfil != null && perfil.apodoVisible() != null) {
+            nombre = perfil.apodoVisible();
+        } else if (persona != null && persona.tieneCuenta()) {
             nombre = persona.nombreCompleto();
         } else if (je.getNombreSnapshot() != null && !je.getNombreSnapshot().isBlank()) {
             nombre = je.getNombreSnapshot();
         } else {
-            nombre = jugador != null ? jugador.getNombre() : null;
+            nombre = persona != null ? persona.nombreCompleto() : null;
         }
 
         return MiembroEquipoDTO.builder()
-                .cedula(je.getCedula())
+                .personaId(je.getPersonaId())
+                .numeroDocumento(persona != null ? persona.numeroDocumento() : null)
                 .nombre(nombre)
-                .posicion(jugador != null ? jugador.getPosicion() : null)
-                .piernaHabil(jugador != null ? jugador.getPiernaHabil() : null)
-                .alturaCm(jugador != null ? jugador.getAlturaCm() : null)
+                .posicion(perfil != null ? perfil.getPosicion() : null)
+                .piernaHabil(perfil != null ? perfil.getPiernaHabil() : null)
+                .alturaCm(perfil != null ? perfil.getAlturaCm() : null)
                 .numeroCamiseta(je.getNumeroCamiseta())
                 .estado(je.getEstado() != null ? je.getEstado().name() : null)
                 .desde(je.getFechaInicio())
-                .esDelegado(je.getCedula().equals(et.getDelegadoCedula()))
+                .esDelegado(je.getPersonaId().equals(et.getDelegadoPersonaId()))
                 .torneoEstado(et.getTorneo().getEstado().name())
                 .tieneCuenta(persona != null && persona.tieneCuenta())
                 .build();

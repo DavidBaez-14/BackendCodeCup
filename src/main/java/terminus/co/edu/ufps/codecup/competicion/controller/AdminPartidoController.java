@@ -51,13 +51,13 @@ public class AdminPartidoController {
 
     @PostMapping("/{partidoId}/alineacion")
     public ResponseEntity<Void> agregarJugador(@PathVariable UUID partidoId, @RequestBody AlineacionRequest req) {
-        partidoAdminService.agregarJugador(partidoId, req.getCedula(), req.getEquipoTorneoId());
+        partidoAdminService.agregarJugador(partidoId, req.getPersonaId(), req.getEquipoTorneoId());
         return ResponseEntity.ok().build();
     }
 
-    @DeleteMapping("/{partidoId}/alineacion/{cedula}")
-    public ResponseEntity<Void> quitarJugador(@PathVariable UUID partidoId, @PathVariable String cedula) {
-        partidoAdminService.quitarJugador(partidoId, cedula);
+    @DeleteMapping("/{partidoId}/alineacion/{personaId}")
+    public ResponseEntity<Void> quitarJugador(@PathVariable UUID partidoId, @PathVariable UUID personaId) {
+        partidoAdminService.quitarJugador(partidoId, personaId);
         return ResponseEntity.noContent().build();
     }
 

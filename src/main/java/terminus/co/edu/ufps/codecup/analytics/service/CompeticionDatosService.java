@@ -95,7 +95,7 @@ public class CompeticionDatosService {
      *
      * <p><b>Pendiente (spec 0016).</b> Devuelve vacío, que es exactamente lo que devolvía
      * el cliente HTTP (el endpoint de MS2 nunca existió). Implementarlo requiere decidir
-     * antes la semántica: los goles de W.O. se registran con {@code cedula = null}, y hay
+     * antes la semántica: los goles de W.O. se registran con {@code persona_id = null}, y hay
      * que fijar los criterios de desempate entre jugadores con los mismos goles.
      */
     public List<GoleadorAgregado> obtenerGoleadores(UUID torneoId) {
@@ -143,7 +143,7 @@ public class CompeticionDatosService {
 
     /** Goles acumulados de un jugador en el torneo. */
     public record GoleadorAgregado(
-            String cedula,
+            UUID personaId,
             String jugadorNombre,
             String equipoNombre,
             int goles) {}

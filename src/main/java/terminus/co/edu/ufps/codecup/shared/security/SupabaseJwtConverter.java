@@ -20,9 +20,9 @@ import terminus.co.edu.ufps.codecup.identidad.api.CuentaAutenticada;
  * autenticación de CodeCup.
  *
  * <p>Los roles salen de {@code identidad.cuenta_roles}, nunca de claims del token.
- * Al {@link Jwt} que reciben los controllers se le agregan {@code cedula},
- * {@code nombre}, {@code cuenta_id} y {@code persona_id}. Así los controllers que leen
- * {@code getClaimAsString("cedula")} siguen igual hasta M2.
+ * Al {@link Jwt} que reciben los controllers se le agregan {@code cuenta_id},
+ * {@code persona_id} y {@code nombre}; los controllers los leen con {@link JwtClaims}.
+ * Desde la spec 0022 ya no se agrega la cédula: la competición usa {@code persona_id}.
  */
 @Component
 @RequiredArgsConstructor
@@ -30,12 +30,14 @@ public class SupabaseJwtConverter implements Converter<Jwt, AbstractAuthenticati
 
     public static final String CLAIM_CUENTA_ID = "cuenta_id";
     public static final String CLAIM_PERSONA_ID = "persona_id";
-    public static final String CLAIM_CEDULA = "cedula";
     public static final String CLAIM_NOMBRE = "nombre";
 
-    /** Ningún claim del token puede hacerse pasar por los que agrega el backend. */
+    /**
+     * Ningún claim del token puede hacerse pasar por los que agrega el backend. "cedula" se
+     * sigue quitando aunque ya nadie lo lea: así un token no puede reintroducirlo.
+     */
     private static final Set<String> CLAIMS_RESERVADOS =
-            Set.of(CLAIM_CUENTA_ID, CLAIM_PERSONA_ID, CLAIM_CEDULA, CLAIM_NOMBRE, "roles");
+            Set.of(CLAIM_CUENTA_ID, CLAIM_PERSONA_ID, CLAIM_NOMBRE, "cedula", "roles");
 
     private final ConsultaCuentas consultaCuentas;
 
@@ -58,7 +60,6 @@ public class SupabaseJwtConverter implements Converter<Jwt, AbstractAuthenticati
             claims.put(CLAIM_CUENTA_ID, cuenta.cuentaId().toString());
             if (cuenta.personaId() != null) claims.put(CLAIM_PERSONA_ID, cuenta.personaId().toString());
             if (cuenta.nombre() != null) claims.put(CLAIM_NOMBRE, cuenta.nombre());
-            if (cuenta.numeroDocumento() != null) claims.put(CLAIM_CEDULA, cuenta.numeroDocumento());
         }
         return Jwt.withTokenValue(jwt.getTokenValue())
                 .headers(h -> h.putAll(jwt.getHeaders()))

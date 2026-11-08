@@ -11,9 +11,9 @@ import terminus.co.edu.ufps.codecup.finanzas.model.Multa;
 
 public interface MultaRepository extends JpaRepository<Multa, UUID> {
 
-    List<Multa> findByCedula(String cedula);
+    List<Multa> findByPersonaId(UUID personaId);
 
-    List<Multa> findByCedulaAndEstado(String cedula, EstadoMulta estado);
+    List<Multa> findByPersonaIdAndEstado(UUID personaId, EstadoMulta estado);
 
     List<Multa> findByTorneoIdAndEstado(UUID torneoId, EstadoMulta estado);
 
@@ -21,24 +21,24 @@ public interface MultaRepository extends JpaRepository<Multa, UUID> {
 
     List<Multa> findByTorneoId(UUID torneoId);
 
-    long countByCedulaAndEstado(String cedula, EstadoMulta estado);
+    long countByPersonaIdAndEstado(UUID personaId, EstadoMulta estado);
 
-    List<Multa> findByCedulaAndTorneoIdAndEstado(String cedula, UUID torneoId, EstadoMulta estado);
+    List<Multa> findByPersonaIdAndTorneoIdAndEstado(UUID personaId, UUID torneoId, EstadoMulta estado);
 
-    boolean existsByCedulaAndTorneoIdAndEstado(String cedula, UUID torneoId, EstadoMulta estado);
+    boolean existsByPersonaIdAndTorneoIdAndEstado(UUID personaId, UUID torneoId, EstadoMulta estado);
 
-    @Query("SELECT m FROM Multa m WHERE m.cedula = :cedula AND m.torneoId = :torneoId " +
+    @Query("SELECT m FROM Multa m WHERE m.personaId = :personaId AND m.torneoId = :torneoId " +
            "AND m.tipoSancion IN ('ROJA', 'ROJA_DIRECTA') " +
            "AND (m.partidosSuspensionRestantes IS NULL OR m.partidosSuspensionRestantes > 0) " +
            "AND m.habilitadoManual = false")
-    List<Multa> findSuspensionesActivas(@Param("cedula") String cedula, @Param("torneoId") UUID torneoId);
+    List<Multa> findSuspensionesActivas(@Param("personaId") UUID personaId, @Param("torneoId") UUID torneoId);
 
-    @Query("SELECT COUNT(m) > 0 FROM Multa m WHERE m.cedula = :cedula AND m.torneoId = :torneoId " +
+    @Query("SELECT COUNT(m) > 0 FROM Multa m WHERE m.personaId = :personaId AND m.torneoId = :torneoId " +
            "AND m.tipoSancion IN ('ROJA', 'ROJA_DIRECTA') " +
            "AND (m.partidosSuspensionRestantes IS NULL OR m.partidosSuspensionRestantes > 0) " +
            "AND m.habilitadoManual = false")
-    boolean existsByCedulaAndTorneoIdAndTipoSancionAndPartidosSuspensionRestantesGreaterThanAndHabilitadoManualFalse(
-            @Param("cedula") String cedula, @Param("torneoId") UUID torneoId);
+    boolean existsByPersonaIdAndTorneoIdAndTipoSancionAndPartidosSuspensionRestantesGreaterThanAndHabilitadoManualFalse(
+            @Param("personaId") UUID personaId, @Param("torneoId") UUID torneoId);
 
     @Query("SELECT m FROM Multa m WHERE m.equipoTorneoId = :equipoTorneoId " +
            "AND m.tipoSancion IN ('ROJA', 'ROJA_DIRECTA') " +
@@ -46,7 +46,7 @@ public interface MultaRepository extends JpaRepository<Multa, UUID> {
            "AND m.habilitadoManual = false")
     List<Multa> findSuspensionesActivasByEquipoTorneo(@Param("equipoTorneoId") UUID equipoTorneoId);
 
-    @Query("SELECT m.cedula, m.equipoTorneoId, " +
+    @Query("SELECT m.personaId, m.equipoTorneoId, " +
            "CASE WHEN m.tipoSancion IN ('ROJA', 'ROJA_DIRECTA') " +
            "     AND (m.partidosSuspensionRestantes IS NULL OR m.partidosSuspensionRestantes > 0) " +
            "     AND m.habilitadoManual = false THEN true ELSE false END, " +

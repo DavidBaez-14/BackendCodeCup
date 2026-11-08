@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import terminus.co.edu.ufps.codecup.shared.security.JwtClaims;
 
 @RestController
 @RequestMapping("/api/supercopa/admin/torneos")
@@ -167,7 +168,7 @@ public class AdminTorneoController {
             @PathVariable UUID torneoId,
             @PathVariable UUID equipoTorneoId,
             @AuthenticationPrincipal Jwt jwt) {
-        String admin = jwt.getClaimAsString("cedula");
+        UUID admin = JwtClaims.cuentaId(jwt);
         return ResponseEntity.ok(torneoAdminService.aprobarInscripcion(torneoId, equipoTorneoId, admin));
     }
 
@@ -195,7 +196,7 @@ public class AdminTorneoController {
             @PathVariable UUID equipoTorneoId,
             @RequestBody RechazoRequestDTO req,
             @AuthenticationPrincipal Jwt jwt) {
-        String admin = jwt.getClaimAsString("cedula");
+        UUID admin = JwtClaims.cuentaId(jwt);
         return ResponseEntity.ok(torneoAdminService.expulsarEquipo(torneoId, equipoTorneoId, req.getMotivo(), admin));
     }
 

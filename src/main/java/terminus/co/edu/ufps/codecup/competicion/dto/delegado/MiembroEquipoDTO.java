@@ -1,5 +1,6 @@
 package terminus.co.edu.ufps.codecup.competicion.dto.delegado;
 
+import java.util.UUID;
 import lombok.*;
 
 import java.time.LocalDate;
@@ -9,7 +10,9 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 public class MiembroEquipoDTO {
-    private String cedula;
+    private UUID personaId;
+    /** Solo para el delegado de este plantel y el admin. */
+    private String numeroDocumento;
     private String nombre;
     private String posicion;
     private String piernaHabil;

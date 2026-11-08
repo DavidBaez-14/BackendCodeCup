@@ -40,8 +40,9 @@ public class Comprobante {
     @Column(name = "url_archivo", nullable = false, length = 500)
     private String urlArchivo;
 
-    @Column(name = "cedula_uploader", nullable = false, length = 20)
-    private String cedulaUploader;
+    /** Cuenta que subió el archivo (spec 0022). */
+    @Column(name = "subido_por_cuenta_id", nullable = false)
+    private UUID subidoPorCuentaId;
 
     @Builder.Default
     @Enumerated(EnumType.STRING)
@@ -51,8 +52,9 @@ public class Comprobante {
     @Column(name = "motivo_rechazo", length = 500)
     private String motivoRechazo;
 
-    @Column(name = "aprobado_por", length = 20)
-    private String aprobadoPor;
+    /** Cuenta del admin que lo aprobó o rechazó. */
+    @Column(name = "resuelto_por_cuenta_id")
+    private UUID resueltoPorCuentaId;
 
     @Builder.Default
     @Column(name = "fecha_subida", nullable = false)

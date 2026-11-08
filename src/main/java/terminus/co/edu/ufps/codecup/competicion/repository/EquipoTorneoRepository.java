@@ -12,8 +12,8 @@ import java.util.UUID;
 public interface EquipoTorneoRepository extends JpaRepository<EquipoTorneo, UUID> {
     List<EquipoTorneo> findByTorneoIdOrderByFechaInscripcionAsc(UUID torneoId);
     List<EquipoTorneo> findByTorneoIdAndEstadoInscripcionOrderByFechaInscripcionAsc(UUID torneoId, EstadoInscripcion estado);
-    List<EquipoTorneo> findByDelegadoCedulaOrderByFechaInscripcionDesc(String delegadoCedula);
-    Optional<EquipoTorneo> findByTorneoIdAndDelegadoCedula(UUID torneoId, String delegadoCedula);
+    List<EquipoTorneo> findByDelegadoPersonaIdOrderByFechaInscripcionDesc(UUID delegadoPersonaId);
+    Optional<EquipoTorneo> findByTorneoIdAndDelegadoPersonaId(UUID torneoId, UUID delegadoPersonaId);
     Optional<EquipoTorneo> findByTorneoIdAndEquipoId(UUID torneoId, UUID equipoId);
     boolean existsByEquipoId(UUID equipoId);
 }

@@ -12,7 +12,7 @@ import java.util.UUID;
 public class EventoDTO {
     private UUID id;
     private Integer orden;
-    private String cedula;
+    private UUID personaId;
     private String jugadorNombre;
     private UUID equipoTorneoId;
     private String equipoNombre;

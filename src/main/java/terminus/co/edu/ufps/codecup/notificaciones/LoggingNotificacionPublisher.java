@@ -10,8 +10,8 @@ import java.util.UUID;
 public class LoggingNotificacionPublisher implements NotificacionPublisher {
 
     @Override
-    public void notificarRojaSuspendida(String cedula, UUID partidoId, int fechasSuspension) {
-        log.info("[NOTIF] roja: cedula={} partido={} partidos={}", cedula, partidoId, fechasSuspension);
+    public void notificarRojaSuspendida(UUID personaId, UUID partidoId, int fechasSuspension) {
+        log.info("[NOTIF] roja: persona={} partido={} partidos={}", personaId, partidoId, fechasSuspension);
     }
 
     @Override

@@ -13,7 +13,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @Entity
 @Table(name = "snapshot_goleador", schema = "analytics",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"torneo_id", "cedula"}))
+        uniqueConstraints = @UniqueConstraint(columnNames = {"torneo_id", "persona_id"}))
 public class SnapshotGoleador {
 
     @Id
@@ -23,8 +23,8 @@ public class SnapshotGoleador {
     @Column(name = "torneo_id", nullable = false)
     private UUID torneoId;
 
-    @Column(name = "cedula", nullable = false, length = 20)
-    private String cedula;
+    @Column(name = "persona_id", nullable = false)
+    private UUID personaId;
 
     @Column(name = "jugador_nombre", length = 150)
     private String jugadorNombre;

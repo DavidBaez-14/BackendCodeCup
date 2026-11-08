@@ -179,7 +179,7 @@ class ComprobanteAccesoSecurityTest extends AuthTestSupport {
 
     // ── Mundo mínimo ────────────────────────────────────────────────────
 
-    private record Inscrito(Usuario delegado, String cedula, EquipoTorneo inscripcion) {
+    private record Inscrito(Usuario delegado, UUID personaId, UUID cuentaId, EquipoTorneo inscripcion) {
     }
 
     /** Un delegado con su equipo inscrito en un torneo propio, en el estado dado. */
@@ -190,17 +190,17 @@ class ComprobanteAccesoSecurityTest extends AuthTestSupport {
                 .estado(EstadoTorneo.PUBLICADO)
                 .build());
         Usuario delegado = cuentaConRoles(Rol.DELEGADO, Rol.JUGADOR);
-        String cedula = cuentaRepository.findConPersona(Cuenta.PROVEEDOR_SUPABASE, delegado.sub())
-                .orElseThrow().getPersona().getNumeroDocumento();
+        var cuenta = cuentaRepository.findConPersona(Cuenta.PROVEEDOR_SUPABASE, delegado.sub()).orElseThrow();
+        UUID personaId = cuenta.getPersona().getId();
         var equipo = equipoRepository.save(Equipo.builder()
-                .nombre("Equipo " + cedula)
-                .delegadoCedula(cedula)
+                .nombre("Equipo " + personaId.toString().substring(0, 8))
+                .delegadoPersonaId(personaId)
                 .build());
         var et = equipoTorneoRepository.save(EquipoTorneo.builder()
-                .torneo(torneo).equipo(equipo).delegadoCedula(cedula)
+                .torneo(torneo).equipo(equipo).delegadoPersonaId(personaId)
                 .estadoInscripcion(estado)
                 .build());
-        return new Inscrito(delegado, cedula, et);
+        return new Inscrito(delegado, personaId, cuenta.getId(), et);
     }
 
     private Comprobante comprobanteDe(Inscrito i) {
@@ -208,7 +208,7 @@ class ComprobanteAccesoSecurityTest extends AuthTestSupport {
                 .tipo(TipoComprobante.INSCRIPCION)
                 .referenciaId(i.inscripcion().getId())
                 .urlArchivo(i.inscripcion().getId() + "/comprobante")
-                .cedulaUploader(i.cedula())
+                .subidoPorCuentaId(i.cuentaId())
                 .estado(EstadoComprobante.PENDIENTE_REVISION)
                 .fechaSubida(LocalDateTime.now())
                 .build());

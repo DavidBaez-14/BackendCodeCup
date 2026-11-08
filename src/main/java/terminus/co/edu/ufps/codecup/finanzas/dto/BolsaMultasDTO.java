@@ -35,7 +35,8 @@ public class BolsaMultasDTO {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class DesgloseArbitro {
-        private String pagadoPorCedula;
+        private UUID pagadoPorCuentaId;
+        private String pagadoPor;
         private BigDecimal total;
         private Long cantidad;
     }

@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import terminus.co.edu.ufps.codecup.identidad.model.TipoDocumento;
 
 /**
  * Agregar un miembro al plantel (spec 0018). La persona puede no tener cuenta:
@@ -18,7 +19,10 @@ public class AgregarMiembroRequest {
 
     /** Número de documento. Se normaliza igual que en el registro ("1.090 123" = "1090123"). */
     @NotBlank(message = "El documento es obligatorio.")
-    private String cedula;
+    private String numeroDocumento;
+
+    /** Tipo de documento; si no llega, CC (spec 0022). Solo se usa si la persona es nueva. */
+    private TipoDocumento tipoDocumento;
 
     /** Nombre completo. Obligatorio solo si la persona no está registrada ni jugó antes. */
     @Size(max = 150, message = "El nombre no puede tener más de 150 caracteres.")

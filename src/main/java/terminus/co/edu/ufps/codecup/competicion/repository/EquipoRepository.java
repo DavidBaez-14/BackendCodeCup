@@ -8,6 +8,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface EquipoRepository extends JpaRepository<Equipo, UUID> {
-    Optional<Equipo> findByDelegadoCedula(String delegadoCedula);
-    boolean existsByDelegadoCedula(String delegadoCedula);
+    Optional<Equipo> findByDelegadoPersonaId(UUID delegadoPersonaId);
+    boolean existsByDelegadoPersonaId(UUID delegadoPersonaId);
 }

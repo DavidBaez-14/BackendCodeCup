@@ -24,7 +24,6 @@ public class PartidoAdminService {
     private final PartidoRepository partidoRepo;
     private final EventoPartidoRepository eventoRepo;
     private final PartidoJugadorRepository partidoJugadorRepo;
-    private final JugadorRepository jugadorRepo;
     private final EquipoTorneoRepository equipoTorneoRepo;
     private final JugadorEquipoRepository jugadorEquipoRepo;
     private final DirectorioPersonas directorioPersonas;
@@ -52,8 +51,8 @@ public class PartidoAdminService {
         if (partido.getEstado() == EstadoPartido.DESCANSO) {
             throw new RuntimeException("Este partido quedo en DESCANSO porque un equipo fue descalificado.");
         }
-        if (req.getCedula() == null || req.getCedula().isBlank()) {
-            throw new RuntimeException("La cedula del jugador es obligatoria.");
+        if (req.getPersonaId() == null) {
+            throw new RuntimeException("El jugador (personaId) es obligatorio.");
         }
         if (req.getEquipoTorneoId() == null) {
             throw new RuntimeException("El equipo (equipoTorneoId) es obligatorio.");
@@ -65,7 +64,8 @@ public class PartidoAdminService {
             throw new RuntimeException("Tipo de evento invalido. Valores validos: GOL, AMARILLA, AZUL, ROJA.");
         }
 
-        var jugador = jugadorRepo.findById(req.getCedula())
+        UUID personaId = req.getPersonaId();
+        directorioPersonas.buscar(personaId)
                 .orElseThrow(() -> new ResourceNotFoundException("Jugador no encontrado."));
         var equipoTorneo = equipoTorneoRepo.findById(req.getEquipoTorneoId())
                 .orElseThrow(() -> new ResourceNotFoundException("Equipo del torneo no encontrado."));
@@ -81,7 +81,7 @@ public class PartidoAdminService {
 
         var evento = EventoPartido.builder()
                 .partido(partido)
-                .cedula(req.getCedula())
+                .personaId(personaId)
                 .equipoTorneo(equipoTorneo)
                 .tipoEvento(tipo)
                 .orden(orden)
@@ -89,10 +89,10 @@ public class PartidoAdminService {
         eventoRepo.save(evento);
 
         if (tipo == TipoEvento.GOL) {
-            var pj = partidoJugadorRepo.findByPartidoIdAndJugadorCedula(partidoId, req.getCedula())
+            var pj = partidoJugadorRepo.findByPartidoIdAndPersonaId(partidoId, personaId)
                     .orElseGet(() -> PartidoJugador.builder()
                             .partido(partido)
-                            .jugador(jugador)
+                            .personaId(personaId)
                             .equipoTorneo(equipoTorneo)
                             .jugo(true)
                             .goles(0)
@@ -127,7 +127,7 @@ public class PartidoAdminService {
             throw new RuntimeException("El evento no pertenece al partido indicado.");
         }
         if (evento.getTipoEvento() == TipoEvento.GOL) {
-            var pj = partidoJugadorRepo.findByPartidoIdAndJugadorCedula(partidoId, evento.getCedula())
+            var pj = partidoJugadorRepo.findByPartidoIdAndPersonaId(partidoId, evento.getPersonaId())
                     .orElse(null);
             if (pj != null && pj.getGoles() != null && pj.getGoles() > 0) {
                 pj.setGoles(pj.getGoles() - 1);
@@ -227,24 +227,24 @@ public class PartidoAdminService {
     }
 
     @Transactional
-    public void agregarJugador(UUID partidoId, String cedula, UUID equipoTorneoId) {
+    public void agregarJugador(UUID partidoId, UUID personaId, UUID equipoTorneoId) {
         var partido = partidoRepo.findById(partidoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Partido no encontrado."));
         if (partido.getEstado() == EstadoPartido.FINALIZADO || partido.getEstado() == EstadoPartido.WO) {
             throw new RuntimeException("No se puede modificar la alineacion de un partido cerrado.");
         }
 
-        var el = multaService.consultarElegibilidad(cedula, partido.getTorneo().getId());
+        var el = multaService.consultarElegibilidad(personaId, partido.getTorneo().getId());
         if (!el.apto()) {
             throw new RuntimeException("Jugador no apto: " + el.formatMotivos());
         }
 
         var equipoTorneo = equipoTorneoRepo.findById(equipoTorneoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Equipo del torneo no encontrado."));
-        var jugador = jugadorRepo.findById(cedula)
+        directorioPersonas.buscar(personaId)
                 .orElseThrow(() -> new ResourceNotFoundException("Jugador no encontrado."));
 
-        var existente = partidoJugadorRepo.findByPartidoIdAndJugadorCedula(partidoId, cedula);
+        var existente = partidoJugadorRepo.findByPartidoIdAndPersonaId(partidoId, personaId);
         if (existente.isPresent()) {
             var pj = existente.get();
             pj.setJugo(true);
@@ -252,7 +252,7 @@ public class PartidoAdminService {
         } else {
             partidoJugadorRepo.save(PartidoJugador.builder()
                     .partido(partido)
-                    .jugador(jugador)
+                    .personaId(personaId)
                     .equipoTorneo(equipoTorneo)
                     .jugo(true)
                     .goles(0)
@@ -261,13 +261,13 @@ public class PartidoAdminService {
     }
 
     @Transactional
-    public void quitarJugador(UUID partidoId, String cedula) {
+    public void quitarJugador(UUID partidoId, UUID personaId) {
         var partido = partidoRepo.findById(partidoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Partido no encontrado."));
         if (partido.getEstado() == EstadoPartido.FINALIZADO || partido.getEstado() == EstadoPartido.WO) {
             throw new RuntimeException("No se puede modificar la alineacion de un partido cerrado.");
         }
-        var pj = partidoJugadorRepo.findByPartidoIdAndJugadorCedula(partidoId, cedula)
+        var pj = partidoJugadorRepo.findByPartidoIdAndPersonaId(partidoId, personaId)
                 .orElseThrow(() -> new ResourceNotFoundException("El jugador no esta en la alineacion."));
         partidoJugadorRepo.delete(pj);
     }
@@ -284,13 +284,11 @@ public class PartidoAdminService {
         var miembros = jugadorEquipoRepo.findByEquipoTorneoIdOrderByFechaInicioAsc(equipoTorneoId);
         for (var je : miembros) {
             if (je.getEstado() != EstadoMembresia.ACTIVO) continue;
-            var existente = partidoJugadorRepo.findByPartidoIdAndJugadorCedula(partidoId, je.getCedula());
+            var existente = partidoJugadorRepo.findByPartidoIdAndPersonaId(partidoId, je.getPersonaId());
             if (existente.isEmpty()) {
-                var jugador = jugadorRepo.findById(je.getCedula()).orElse(null);
-                if (jugador == null) continue;
                 partidoJugadorRepo.save(PartidoJugador.builder()
                         .partido(partido)
-                        .jugador(jugador)
+                        .personaId(je.getPersonaId())
                         .equipoTorneo(equipoTorneo)
                         .jugo(true)
                         .goles(0)
@@ -329,7 +327,7 @@ public class PartidoAdminService {
         for (int i = 0; i < 3; i++) {
             eventoRepo.save(EventoPartido.builder()
                     .partido(partido)
-                    .cedula(null)
+                    .personaId(null)
                     .equipoTorneo(ganador)
                     .tipoEvento(TipoEvento.GOL)
                     .orden(i + 1)
@@ -395,13 +393,11 @@ public class PartidoAdminService {
         var miembros = jugadorEquipoRepo.findByEquipoTorneoIdOrderByFechaInicioAsc(equipoTorneo.getId());
         for (var je : miembros) {
             if (je.getEstado() != EstadoMembresia.ACTIVO) continue;
-            var existente = partidoJugadorRepo.findByPartidoIdAndJugadorCedula(partido.getId(), je.getCedula());
+            var existente = partidoJugadorRepo.findByPartidoIdAndPersonaId(partido.getId(), je.getPersonaId());
             if (existente.isEmpty()) {
-                var jugador = jugadorRepo.findById(je.getCedula()).orElse(null);
-                if (jugador == null) continue;
                 partidoJugadorRepo.save(PartidoJugador.builder()
                         .partido(partido)
-                        .jugador(jugador)
+                        .personaId(je.getPersonaId())
                         .equipoTorneo(equipoTorneo)
                         .jugo(true)
                         .goles(0)
@@ -416,10 +412,12 @@ public class PartidoAdminService {
     }
 
     private PartidoJugadorDTO toPartidoJugadorDTO(PartidoJugador pj) {
+        var persona = directorioPersonas.buscar(pj.getPersonaId()).orElse(null);
         return PartidoJugadorDTO.builder()
                 .id(pj.getId())
-                .cedula(pj.getJugador().getCedula())
-                .jugadorNombre(resolverNombreReal(pj.getJugador().getCedula(),
+                .personaId(pj.getPersonaId())
+                .numeroDocumento(persona != null ? persona.numeroDocumento() : null)
+                .jugadorNombre(nombreEnTorneo(persona, pj.getPersonaId(),
                         pj.getEquipoTorneo().getTorneo().getId()))
                 .equipoTorneoId(pj.getEquipoTorneo().getId())
                 .equipoNombre(pj.getEquipoTorneo().getEquipo().getNombre())
@@ -456,7 +454,7 @@ public class PartidoAdminService {
         return EventoDTO.builder()
                 .id(e.getId())
                 .orden(e.getOrden())
-                .cedula(e.getCedula())
+                .personaId(e.getPersonaId())
                 .jugadorNombre(resolverNombreReal(e))
                 .equipoTorneoId(e.getEquipoTorneo().getId())
                 .equipoNombre(e.getEquipoTorneo().getEquipo().getNombre())
@@ -466,22 +464,22 @@ public class PartidoAdminService {
     }
 
     private String resolverNombreReal(EventoPartido e) {
-        return resolverNombreReal(e.getCedula(), e.getEquipoTorneo().getTorneo().getId());
+        if (e.getPersonaId() == null) return null; // goles de W.O.
+        return nombreEnTorneo(directorioPersonas.buscar(e.getPersonaId()).orElse(null),
+                e.getPersonaId(), e.getEquipoTorneo().getTorneo().getId());
     }
 
     /**
      * Spec 0018: el nombre registrado gana, porque lo decide la persona. Si no tiene
-     * cuenta, el snapshot del torneo (lo que escribio el delegado al agregarlo).
+     * cuenta, el snapshot del torneo (lo que escribio el delegado al agregarlo); y si
+     * tampoco hay snapshot, el nombre de la persona (spec 0022).
      */
-    private String resolverNombreReal(String cedula, UUID torneoId) {
-        if (cedula == null) return null;
-        var registrado = directorioPersonas.buscarPorDocumento(cedula)
-                .map(PersonaResumen::nombreCompleto);
-        if (registrado.isPresent()) return registrado.get();
+    private String nombreEnTorneo(PersonaResumen persona, UUID personaId, UUID torneoId) {
+        if (persona != null && persona.tieneCuenta()) return persona.nombreCompleto();
         return jugadorEquipoRepo
-                .findByCedulaAndTorneoId(cedula, torneoId)
+                .findByPersonaIdAndTorneoId(personaId, torneoId)
                 .map(JugadorEquipo::getNombreSnapshot)
                 .filter(s -> s != null && !s.isBlank())
-                .orElse(null);
+                .orElse(persona != null ? persona.nombreCompleto() : null);
     }
 }

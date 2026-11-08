@@ -57,11 +57,11 @@ class AdminRolesServiceTest {
     void eliminarCuenta_bloqueaYBorraRoles() {
         var c = cuenta("1090");
         var roles = List.of(rol(c, Rol.JUGADOR, EstadoRol.APROBADO), rol(c, Rol.DELEGADO, EstadoRol.APROBADO));
-        when(cuentaRepository.findByNumeroDocumento("1090")).thenReturn(Optional.of(c));
+        when(cuentaRepository.findById(c.getId())).thenReturn(Optional.of(c));
         when(cuentaRolRepository.findByCuentaIdAndRol(c.getId(), Rol.ADMINISTRADOR)).thenReturn(Optional.empty());
         when(cuentaRolRepository.findByCuentaId(c.getId())).thenReturn(roles);
 
-        service.eliminarCuenta("1.090", "Suplantación", UUID.randomUUID());
+        service.eliminarCuenta(c.getId(), "Suplantación", UUID.randomUUID());
 
         assertThat(c.getEstado()).isEqualTo(EstadoCuenta.BLOQUEADA);
         verify(cuentaRolRepository).deleteAll(roles);
@@ -72,9 +72,9 @@ class AdminRolesServiceTest {
     @Test
     void noPuedeBloquearseASiMismo() {
         var c = cuenta("1090");
-        when(cuentaRepository.findByNumeroDocumento("1090")).thenReturn(Optional.of(c));
+        when(cuentaRepository.findById(c.getId())).thenReturn(Optional.of(c));
 
-        assertThatThrownBy(() -> service.eliminarCuenta("1090", "x", c.getId()))
+        assertThatThrownBy(() -> service.eliminarCuenta(c.getId(), "x", c.getId()))
                 .isInstanceOf(ApiException.class)
                 .hasFieldOrPropertyWithValue("code", "AUTO_BLOQUEO");
         assertThat(c.getEstado()).isEqualTo(EstadoCuenta.ACTIVA);
@@ -83,12 +83,12 @@ class AdminRolesServiceTest {
     @Test
     void noSeBloqueaAlUltimoAdmin() {
         var c = cuenta("1090");
-        when(cuentaRepository.findByNumeroDocumento("1090")).thenReturn(Optional.of(c));
+        when(cuentaRepository.findById(c.getId())).thenReturn(Optional.of(c));
         when(cuentaRolRepository.findByCuentaIdAndRol(c.getId(), Rol.ADMINISTRADOR))
                 .thenReturn(Optional.of(rol(c, Rol.ADMINISTRADOR, EstadoRol.APROBADO)));
         when(cuentaRolRepository.countByRolAndEstado(Rol.ADMINISTRADOR, EstadoRol.APROBADO)).thenReturn(1L);
 
-        assertThatThrownBy(() -> service.eliminarCuenta("1090", "x", UUID.randomUUID()))
+        assertThatThrownBy(() -> service.eliminarCuenta(c.getId(), "x", UUID.randomUUID()))
                 .isInstanceOf(ApiException.class)
                 .hasFieldOrPropertyWithValue("code", "ULTIMO_ADMIN");
     }
@@ -109,7 +109,7 @@ class AdminRolesServiceTest {
 
     @Test
     void asignarJugador_400PorqueEsAutomatico() {
-        assertThatThrownBy(() -> service.asignarRol("1090", Rol.JUGADOR, "x", UUID.randomUUID()))
+        assertThatThrownBy(() -> service.asignarRol(UUID.randomUUID(), Rol.JUGADOR, "x", UUID.randomUUID()))
                 .isInstanceOf(ApiException.class)
                 .hasFieldOrPropertyWithValue("code", "ROL_AUTOMATICO");
     }

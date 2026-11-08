@@ -1,5 +1,6 @@
 package terminus.co.edu.ufps.codecup.competicion.dto;
 
+import java.util.UUID;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -11,7 +12,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PerfilResponseDTO {
-    private String cedula;
+    private UUID personaId;
     private String nombre;
     // Datos deportivos del Jugador local. Opcionales (spec 0020): null si el
     // jugador aun no los indico.

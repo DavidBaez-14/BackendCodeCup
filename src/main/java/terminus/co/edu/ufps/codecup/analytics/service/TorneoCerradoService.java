@@ -64,8 +64,8 @@ public class TorneoCerradoService {
             return;
         }
         SnapshotGoleador g = top.get(0);
-        datos.asignarPremio(torneoId, torneoPremioId, porCedula(g.getCedula()));
-        log.info("Goleador asignado: {} ({} goles)", g.getCedula(), g.getGoles());
+        datos.asignarPremio(torneoId, torneoPremioId, porPersona(g.getPersonaId()));
+        log.info("Goleador asignado: {} ({} goles)", g.getPersonaId(), g.getGoles());
     }
 
     private void asignarPortero(UUID torneoId, UUID torneoPremioId) {
@@ -120,9 +120,9 @@ public class TorneoCerradoService {
         log.warn("No se encontró partido de {} para torneo {}", faseFinal, torneoId);
     }
 
-    private static AsignarPremioRequest porCedula(String cedula) {
+    private static AsignarPremioRequest porPersona(UUID personaId) {
         var req = new AsignarPremioRequest();
-        req.setCedula(cedula);
+        req.setPersonaId(personaId);
         return req;
     }
 

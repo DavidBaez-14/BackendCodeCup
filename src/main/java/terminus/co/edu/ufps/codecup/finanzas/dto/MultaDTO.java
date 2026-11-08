@@ -14,7 +14,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class MultaDTO {
     private UUID id;
-    private String cedula;
+    private UUID personaId;
+    private String jugadorNombre;
     private UUID partidoId;
     private UUID equipoTorneoId;
     private UUID torneoId;
@@ -23,10 +24,12 @@ public class MultaDTO {
     private String estado;
     private Integer partidosSuspension;
     private Integer partidosSuspensionRestantes;
-    private String pagadoPorCedula;
+    private UUID pagadoPorCuentaId;
+    /** Nombre de quien registró el pago. */
+    private String pagadoPor;
     private UUID partidoPagoId;
     private Boolean habilitadoManual;
-    private String habilitadoPorCedula;
+    private String habilitadoPor;
     private LocalDateTime habilitadoEn;
     private String motivoHabilitacion;
     private LocalDateTime fechaGeneracion;

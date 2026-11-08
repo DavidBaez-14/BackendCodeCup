@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.transaction.support.TransactionTemplate;
 import terminus.co.edu.ufps.codecup.competicion.model.Equipo;
 import terminus.co.edu.ufps.codecup.competicion.model.EquipoTorneo;
@@ -19,14 +20,14 @@ import terminus.co.edu.ufps.codecup.competicion.model.EstadoPartido;
 import terminus.co.edu.ufps.codecup.competicion.model.EstadoTorneo;
 import terminus.co.edu.ufps.codecup.competicion.model.FaseTorneo;
 import terminus.co.edu.ufps.codecup.competicion.model.FormatoTorneo;
-import terminus.co.edu.ufps.codecup.competicion.model.Jugador;
+import terminus.co.edu.ufps.codecup.competicion.model.PerfilDeportivo;
 import terminus.co.edu.ufps.codecup.competicion.model.JugadorEquipo;
 import terminus.co.edu.ufps.codecup.competicion.model.Partido;
 import terminus.co.edu.ufps.codecup.competicion.model.Torneo;
 import terminus.co.edu.ufps.codecup.competicion.repository.EquipoRepository;
 import terminus.co.edu.ufps.codecup.competicion.repository.EquipoTorneoRepository;
 import terminus.co.edu.ufps.codecup.competicion.repository.JugadorEquipoRepository;
-import terminus.co.edu.ufps.codecup.competicion.repository.JugadorRepository;
+import terminus.co.edu.ufps.codecup.competicion.repository.PerfilDeportivoRepository;
 import terminus.co.edu.ufps.codecup.competicion.repository.PartidoRepository;
 import terminus.co.edu.ufps.codecup.competicion.repository.TorneoRepository;
 import terminus.co.edu.ufps.codecup.identidad.model.Cuenta;
@@ -53,7 +54,7 @@ public final class SeedService {
 
     /** Los repositorios que toca el seed. */
     public record Repositorios(PersonaRepository personas, CuentaRepository cuentas, CuentaRolRepository roles,
-                               JugadorRepository jugadores, TorneoRepository torneos, EquipoRepository equipos,
+                               PerfilDeportivoRepository perfiles, TorneoRepository torneos, EquipoRepository equipos,
                                EquipoTorneoRepository inscripciones, JugadorEquipoRepository planteles,
                                PartidoRepository partidos) {
     }
@@ -127,16 +128,21 @@ public final class SeedService {
             }
         }
 
-        if (u.perfil() != null && repos.jugadores().findById(u.documento()).isEmpty()) {
-            repos.jugadores().save(Jugador.builder()
-                    .cedula(u.documento())
-                    .nombre(u.nombreCompleto())
-                    .correo(u.correo())
+        if (u.perfil() != null && repos.perfiles().findById(persona.getId()).isEmpty()) {
+            repos.perfiles().save(PerfilDeportivo.builder()
+                    .personaId(persona.getId())
                     .alturaCm(u.perfil().alturaCm())
                     .piernaHabil(u.perfil().piernaHabil())
                     .posicion(u.perfil().posicion())
                     .build());
         }
+    }
+
+    /** Persona de un usuario de prueba (ya creada en asegurarCuenta). */
+    private UUID personaDe(UsuarioPrueba u) {
+        return repos.personas().findFirstByNumeroDocumento(u.documento())
+                .orElseThrow(() -> new IllegalStateException("Falta la persona de " + u.alias()))
+                .getId();
     }
 
     // ── Competición ─────────────────────────────────────────────────────
@@ -162,17 +168,18 @@ public final class SeedService {
         for (int i = 0; i < equipos.size(); i++) {
             EquipoPrueba ep = equipos.get(i);
             UsuarioPrueba delegado = porAlias.get(ep.aliasDelegado());
-            Equipo equipo = repos.equipos().findByDelegadoCedula(delegado.documento())
+            UUID delegadoId = personaDe(delegado);
+            Equipo equipo = repos.equipos().findByDelegadoPersonaId(delegadoId)
                     .orElseGet(() -> repos.equipos().save(Equipo.builder()
                             .nombre(ep.nombre())
-                            .delegadoCedula(delegado.documento())
+                            .delegadoPersonaId(delegadoId)
                             .build()));
 
-            EquipoTorneo enCopa = asegurarInscripcion(copa, equipo, delegado.documento(), estadosEnCopa[i]);
+            EquipoTorneo enCopa = asegurarInscripcion(copa, equipo, delegadoId, estadosEnCopa[i]);
             miembros += asegurarPlantel(copa, enCopa, delegado, ep.plantel(), porAlias);
 
             if (i < 2) {
-                EquipoTorneo enLaLiga = asegurarInscripcion(liga, equipo, delegado.documento(), EstadoInscripcion.APROBADO);
+                EquipoTorneo enLaLiga = asegurarInscripcion(liga, equipo, delegadoId, EstadoInscripcion.APROBADO);
                 miembros += asegurarPlantel(liga, enLaLiga, delegado, ep.plantel(), porAlias);
                 enLiga.add(enLaLiga);
             }
@@ -204,15 +211,14 @@ public final class SeedService {
                 .build()));
     }
 
-    private EquipoTorneo asegurarInscripcion(Torneo torneo, Equipo equipo, String delegadoCedula,
+    private EquipoTorneo asegurarInscripcion(Torneo torneo, Equipo equipo, UUID delegadoPersonaId,
                                              EstadoInscripcion estado) {
         return repos.inscripciones().findByTorneoIdAndEquipoId(torneo.getId(), equipo.getId())
                 .orElseGet(() -> repos.inscripciones().save(EquipoTorneo.builder()
                         .torneo(torneo)
                         .equipo(equipo)
-                        .delegadoCedula(delegadoCedula)
+                        .delegadoPersonaId(delegadoPersonaId)
                         .estadoInscripcion(estado)
-                        .aprobadoPor(estado == EstadoInscripcion.APROBADO ? "seed" : null)
                         .build()));
     }
 
@@ -227,10 +233,11 @@ public final class SeedService {
         for (int k = 0; k < miembros.size(); k++) camisetas.put(miembros.get(k).documento(), k + 1);
 
         for (UsuarioPrueba m : miembros) {
-            if (repos.planteles().findByCedulaAndTorneoId(m.documento(), torneo.getId()).isPresent()) continue;
+            UUID personaId = personaDe(m);
+            if (repos.planteles().findByPersonaIdAndTorneoId(personaId, torneo.getId()).isPresent()) continue;
             var perfil = m.perfil();
             repos.planteles().save(JugadorEquipo.builder()
-                    .cedula(m.documento())
+                    .personaId(personaId)
                     .torneo(torneo)
                     .equipoTorneo(inscripcion)
                     .fechaInicio(LocalDate.now())

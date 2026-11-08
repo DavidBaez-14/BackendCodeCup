@@ -3,6 +3,8 @@ package terminus.co.edu.ufps.codecup.competicion.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import terminus.co.edu.ufps.codecup.identidad.api.DirectorioPersonas;
+import terminus.co.edu.ufps.codecup.identidad.api.PersonaResumen;
 import terminus.co.edu.ufps.codecup.shared.error.ApiException;
 import terminus.co.edu.ufps.codecup.shared.error.ResourceNotFoundException;
 import terminus.co.edu.ufps.codecup.competicion.dto.admin.*;
@@ -26,6 +28,7 @@ public class PremioService {
     private final TorneoPremioRepository torneoPremioRepo;
     private final PremioAsignadoRepository premioAsignadoRepo;
     private final EquipoTorneoRepository equipoTorneoRepo;
+    private final DirectorioPersonas directorioPersonas;
 
     @Transactional(readOnly = true)
     public List<PremioDTO> listarPremios(UUID torneoId) {
@@ -123,8 +126,8 @@ public class PremioService {
             throw new RuntimeException("El premio no pertenece a este torneo.");
         }
 
-        if (req.getCedula() == null && req.getEquipoTorneoId() == null) {
-            throw new RuntimeException("Debe especificar cedula (individual) o equipoTorneoId (colectivo).");
+        if (req.getPersonaId() == null && req.getEquipoTorneoId() == null) {
+            throw new RuntimeException("Debe especificar personaId (individual) o equipoTorneoId (colectivo).");
         }
 
         var asignacion = premioAsignadoRepo.findByTorneoIdAndPremioId(torneoId, torneoPremioId)
@@ -133,7 +136,7 @@ public class PremioService {
                         .premioId(torneoPremioId)
                         .build());
 
-        asignacion.setCedula(req.getCedula());
+        asignacion.setPersonaId(req.getPersonaId());
         asignacion.setEquipoTorneoId(req.getEquipoTorneoId());
         asignacion.setFechaAsignacion(LocalDateTime.now());
         premioAsignadoRepo.save(asignacion);
@@ -172,7 +175,10 @@ public class PremioService {
                 .titulo(tp.getTitulo())
                 .descripcion(tp.getDescripcion())
                 .monto(tp.getMonto())
-                .ganadorCedula(asignacion != null ? asignacion.getCedula() : null)
+                .ganadorPersonaId(asignacion != null ? asignacion.getPersonaId() : null)
+                .ganadorNombre(asignacion != null && asignacion.getPersonaId() != null
+                        ? directorioPersonas.buscar(asignacion.getPersonaId()).map(PersonaResumen::nombreCompleto).orElse(null)
+                        : null)
                 .ganadorEquipoTorneoId(asignacion != null ? asignacion.getEquipoTorneoId() : null)
                 .ganadorEquipoNombre(equipoNombre)
                 .asignadoEn(asignacion != null ? asignacion.getFechaAsignacion() : null)

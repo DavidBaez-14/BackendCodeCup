@@ -8,6 +8,6 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AlineacionRequest {
-    private String cedula;
+    private UUID personaId;
     private UUID equipoTorneoId;
 }

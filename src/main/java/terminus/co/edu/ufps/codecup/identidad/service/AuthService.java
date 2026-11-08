@@ -51,19 +51,21 @@ public class AuthService {
         if (numero == null) {
             throw ApiException.badRequest("DOCUMENTO_INVALIDO", "Escribe el número de documento.");
         }
-        // Hasta M2 la competición identifica a las personas solo por el número:
-        // CC 1090 y TI 1090 serían la misma "cédula". Por eso no se repite el número.
-        if (personaRepository.existsByNumeroDocumento(numero)) {
+        // El número no se repite aunque cambie el tipo: la TI y la CC comparten el NUIP.
+        var existente = personaRepository.findFirstByNumeroDocumento(numero).orElse(null);
+        if (existente != null && cuentaRepository.findByPersonaId(existente.getId()).isPresent()) {
             throw ApiException.conflict("DOCUMENTO_REGISTRADO",
                     "Ya existe una cuenta con este documento. Entra con la forma que usaste la primera vez (Google o tu correo y contraseña).");
         }
 
-        var persona = personaRepository.save(Persona.builder()
-                .nombres(req.getNombres().trim())
-                .apellidos(req.getApellidos().trim())
-                .tipoDocumento(req.getTipoDocumento())
-                .numeroDocumento(numero)
-                .build());
+        // Spec 0022: si el documento es de un miembro sin cuenta (lo agregó un delegado), la cuenta
+        // se asocia a esa persona y ve su historial, como hasta ahora. El nombre lo decide quien se
+        // registra. La spec 0023 cambia esto por una vinculación que se aprueba.
+        Persona persona = existente != null ? existente : Persona.builder().numeroDocumento(numero).build();
+        persona.setNombres(req.getNombres().trim());
+        persona.setApellidos(req.getApellidos().trim());
+        persona.setTipoDocumento(req.getTipoDocumento());
+        persona = personaRepository.save(persona);
         var cuenta = cuentaRepository.save(Cuenta.builder()
                 .proveedor(Cuenta.PROVEEDOR_SUPABASE)
                 .proveedorSub(sub)
@@ -130,7 +132,6 @@ public class AuthService {
                 .tipoDocumento(persona != null && persona.getTipoDocumento() != null
                         ? persona.getTipoDocumento().name() : null)
                 .numeroDocumento(persona != null ? persona.getNumeroDocumento() : null)
-                .cedula(persona != null ? persona.getNumeroDocumento() : null)
                 .estado(cuenta.getEstado().name())
                 .roles(rolesCuenta.aprobados(cuenta))
                 .rolesPendientes(rolesCuenta.pendientes(cuenta))

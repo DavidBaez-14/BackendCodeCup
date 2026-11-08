@@ -17,12 +17,12 @@ import terminus.co.edu.ufps.codecup.competicion.model.Equipo;
 import terminus.co.edu.ufps.codecup.competicion.model.EquipoTorneo;
 import terminus.co.edu.ufps.codecup.competicion.model.EstadoInscripcion;
 import terminus.co.edu.ufps.codecup.competicion.model.EstadoTorneo;
-import terminus.co.edu.ufps.codecup.competicion.model.Jugador;
+import terminus.co.edu.ufps.codecup.competicion.model.PerfilDeportivo;
 import terminus.co.edu.ufps.codecup.competicion.model.Torneo;
 import terminus.co.edu.ufps.codecup.competicion.repository.EquipoRepository;
 import terminus.co.edu.ufps.codecup.competicion.repository.EquipoTorneoRepository;
 import terminus.co.edu.ufps.codecup.competicion.repository.JugadorEquipoRepository;
-import terminus.co.edu.ufps.codecup.competicion.repository.JugadorRepository;
+import terminus.co.edu.ufps.codecup.competicion.repository.PerfilDeportivoRepository;
 import terminus.co.edu.ufps.codecup.competicion.repository.TorneoRepository;
 import terminus.co.edu.ufps.codecup.identidad.AuthTestSupport;
 import terminus.co.edu.ufps.codecup.identidad.model.Cuenta;
@@ -40,7 +40,7 @@ class PerfilDeportivoOpcionalTest extends AuthTestSupport {
     @Autowired TorneoRepository torneoRepository;
     @Autowired EquipoRepository equipoRepository;
     @Autowired EquipoTorneoRepository equipoTorneoRepository;
-    @Autowired JugadorRepository jugadorRepository;
+    @Autowired PerfilDeportivoRepository perfilRepository;
     @Autowired JugadorEquipoRepository jugadorEquipoRepository;
 
     // ── Criterios 1 y 2: pedir unirse a un equipo ───────────────────────
@@ -50,7 +50,7 @@ class PerfilDeportivoOpcionalTest extends AuthTestSupport {
         var torneo = torneoPublicado();
         var delegado = delegadoConEquipo();
         var inscripcion = equipoTorneoRepository.save(EquipoTorneo.builder()
-                .torneo(torneo).equipo(delegado.equipo()).delegadoCedula(delegado.cedula())
+                .torneo(torneo).equipo(delegado.equipo()).delegadoPersonaId(delegado.personaId())
                 .estadoInscripcion(EstadoInscripcion.PENDIENTE_PAGO)
                 .build());
         var jugador = usuario();
@@ -62,21 +62,20 @@ class PerfilDeportivoOpcionalTest extends AuthTestSupport {
                         .content(json(Map.of("equipoTorneoId", inscripcion.getId()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.estado").value("PENDIENTE"))
-                .andExpect(jsonPath("$.cedula").value(doc))
+                .andExpect(jsonPath("$.numeroDocumento").value(doc))
+                .andExpect(jsonPath("$.personaId").value(personaDe(doc).toString()))
                 .andReturn().getResponse().getContentAsString();
         String solicitudId = objectMapper.readTree(respuesta).get("id").asText();
 
-        var local = jugadorRepository.findById(doc).orElseThrow();
-        assertThat(local.getAlturaCm()).isNull();
-        assertThat(local.getPiernaHabil()).isNull();
-        assertThat(local.getPosicion()).isNull();
+        // Spec 0022: pedir ingreso ya no crea filas de perfil deportivo.
+        assertThat(perfilRepository.findById(personaDe(doc))).isEmpty();
 
         mvc.perform(post("/api/supercopa/solicitudes/{id}/aprobar", solicitudId)
                         .header("Authorization", delegado.usuario().bearer()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.estado").value("APROBADA"));
 
-        var je = jugadorEquipoRepository.findByCedulaAndTorneoId(doc, torneo.getId()).orElseThrow();
+        var je = jugadorEquipoRepository.findByPersonaIdAndTorneoId(personaDe(doc), torneo.getId()).orElseThrow();
         assertThat(je.getAlturaCmSnapshot()).isNull();
         assertThat(je.getPiernaHabilSnapshot()).isNull();
         assertThat(je.getPosicionSnapshot()).isNull();
@@ -93,9 +92,9 @@ class PerfilDeportivoOpcionalTest extends AuthTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.estadoInscripcion").value("PENDIENTE_PAGO"));
 
-        assertThat(equipoTorneoRepository.findByTorneoIdAndDelegadoCedula(torneo.getId(), delegado.cedula()))
+        assertThat(equipoTorneoRepository.findByTorneoIdAndDelegadoPersonaId(torneo.getId(), delegado.personaId()))
                 .isPresent();
-        var je = jugadorEquipoRepository.findByCedulaAndTorneoId(delegado.cedula(), torneo.getId()).orElseThrow();
+        var je = jugadorEquipoRepository.findByPersonaIdAndTorneoId(delegado.personaId(), torneo.getId()).orElseThrow();
         assertThat(je.getAlturaCmSnapshot()).isNull();
         assertThat(je.getPiernaHabilSnapshot()).isNull();
         assertThat(je.getPosicionSnapshot()).isNull();
@@ -105,14 +104,14 @@ class PerfilDeportivoOpcionalTest extends AuthTestSupport {
     void inscribir_delegadoConPerfil_copiaElSnapshot() throws Exception {
         var torneo = torneoPublicado();
         var delegado = delegadoConEquipo();
-        jugadorRepository.save(Jugador.builder()
-                .cedula(delegado.cedula()).nombre("Admin Prueba")
+        perfilRepository.save(PerfilDeportivo.builder()
+                .personaId(delegado.personaId())
                 .alturaCm(181).piernaHabil("IZQUIERDA").posicion("PORTERO")
                 .build());
 
         inscribir(delegado, torneo).andExpect(status().isOk());
 
-        var je = jugadorEquipoRepository.findByCedulaAndTorneoId(delegado.cedula(), torneo.getId()).orElseThrow();
+        var je = jugadorEquipoRepository.findByPersonaIdAndTorneoId(delegado.personaId(), torneo.getId()).orElseThrow();
         assertThat(je.getAlturaCmSnapshot()).isEqualTo(181);
         assertThat(je.getPiernaHabilSnapshot()).isEqualTo("IZQUIERDA");
         assertThat(je.getPosicionSnapshot()).isEqualTo("PORTERO");
@@ -141,7 +140,7 @@ class PerfilDeportivoOpcionalTest extends AuthTestSupport {
         // Todo vacío: se borra.
         actualizarPerfil(u, Map.of()).andExpect(status().isOk());
 
-        var local = jugadorRepository.findById(doc).orElseThrow();
+        var local = perfilRepository.findById(personaDe(doc)).orElseThrow();
         assertThat(local.getAlturaCm()).isNull();
         assertThat(local.getPiernaHabil()).isNull();
         assertThat(local.getPosicion()).isNull();
@@ -158,7 +157,7 @@ class PerfilDeportivoOpcionalTest extends AuthTestSupport {
         actualizarPerfil(u, perfil(null, "ZURDA", null)).andExpect(status().isBadRequest());
         actualizarPerfil(u, perfil(null, null, "ARQUERO")).andExpect(status().isBadRequest());
 
-        var local = jugadorRepository.findById(doc).orElseThrow();
+        var local = perfilRepository.findById(personaDe(doc)).orElseThrow();
         assertThat(local.getAlturaCm()).isEqualTo(175);
         assertThat(local.getPiernaHabil()).isEqualTo("DERECHA");
         assertThat(local.getPosicion()).isEqualTo("DEFENSA");
@@ -170,19 +169,23 @@ class PerfilDeportivoOpcionalTest extends AuthTestSupport {
 
     // ── Mundo mínimo ────────────────────────────────────────────────────
 
-    /** Un delegado (con JUGADOR) que ya creó su equipo. No tiene fila de jugador ni perfil. */
-    private record Delegado(Usuario usuario, String cedula, Equipo equipo) {
+    /** Un delegado (con JUGADOR) que ya creó su equipo. No tiene perfil deportivo. */
+    private record Delegado(Usuario usuario, UUID personaId, Equipo equipo) {
     }
 
     private Delegado delegadoConEquipo() {
         Usuario u = cuentaConRoles(Rol.DELEGADO, Rol.JUGADOR);
-        String cedula = cuentaRepository.findConPersona(Cuenta.PROVEEDOR_SUPABASE, u.sub())
-                .orElseThrow().getPersona().getNumeroDocumento();
+        UUID personaId = cuentaRepository.findConPersona(Cuenta.PROVEEDOR_SUPABASE, u.sub())
+                .orElseThrow().getPersona().getId();
         var equipo = equipoRepository.save(Equipo.builder()
-                .nombre("Equipo " + cedula)
-                .delegadoCedula(cedula)
+                .nombre("Equipo " + personaId.toString().substring(0, 8))
+                .delegadoPersonaId(personaId)
                 .build());
-        return new Delegado(u, cedula, equipo);
+        return new Delegado(u, personaId, equipo);
+    }
+
+    private UUID personaDe(String documento) {
+        return personaRepository.findFirstByNumeroDocumento(documento).orElseThrow().getId();
     }
 
     private Torneo torneoPublicado() {

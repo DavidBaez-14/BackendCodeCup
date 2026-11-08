@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import terminus.co.edu.ufps.codecup.identidad.api.DirectorioPersonas;
+import terminus.co.edu.ufps.codecup.identidad.api.PersonaResumen;
 import terminus.co.edu.ufps.codecup.shared.error.ResourceNotFoundException;
 import terminus.co.edu.ufps.codecup.competicion.dto.TorneoDTO;
 import terminus.co.edu.ufps.codecup.competicion.dto.admin.CrearTorneoRequest;
@@ -50,6 +52,7 @@ public class TorneoAdminService {
     private final EventoPartidoRepository eventoPartidoRepo;
     private final TituloRepository tituloRepo;
     private final ComprobanteRepository comprobanteRepo;
+    private final DirectorioPersonas directorioPersonas;
 
     @Transactional
     public TorneoDTO crear(CrearTorneoRequest req) {
@@ -234,7 +237,7 @@ public class TorneoAdminService {
     }
 
     @Transactional
-    public InscripcionDTO aprobarInscripcion(UUID torneoId, UUID equipoTorneoId, String adminCedula) {
+    public InscripcionDTO aprobarInscripcion(UUID torneoId, UUID equipoTorneoId, UUID adminCuentaId) {
         var et = cargarInscripcion(torneoId, equipoTorneoId);
         if (et.getEstadoInscripcion() == EstadoInscripcion.APROBADO) {
             return toInscripcionDTO(et);
@@ -246,10 +249,10 @@ public class TorneoAdminService {
             throw new RuntimeException("El equipo fue descalificado del torneo y no puede aprobarse.");
         }
         et.setEstadoInscripcion(EstadoInscripcion.APROBADO);
-        et.setAprobadoPor(adminCedula != null ? adminCedula : "ADMIN");
+        et.setAprobadoPorCuentaId(adminCuentaId);
         et.setMotivoRechazo(null);
         equipoTorneoRepo.save(et);
-        resolverComprobanteInscripcion(equipoTorneoId, EstadoComprobante.APROBADO, null, et.getAprobadoPor());
+        resolverComprobanteInscripcion(equipoTorneoId, EstadoComprobante.APROBADO, null, adminCuentaId);
         return toInscripcionDTO(et);
     }
 
@@ -258,12 +261,12 @@ public class TorneoAdminService {
      * aprueba o rechaza desde el panel de torneo, para que no quede colgado "En revision".
      */
     private void resolverComprobanteInscripcion(UUID equipoTorneoId, EstadoComprobante nuevoEstado,
-                                                String motivo, String adminCedula) {
+                                                String motivo, UUID adminCuentaId) {
         comprobanteRepo.findByReferenciaId(equipoTorneoId).stream()
                 .filter(c -> c.getEstado() == EstadoComprobante.PENDIENTE_REVISION)
                 .forEach(c -> {
                     c.setEstado(nuevoEstado);
-                    c.setAprobadoPor(adminCedula);
+                    c.setResueltoPorCuentaId(adminCuentaId);
                     if (nuevoEstado == EstadoComprobante.RECHAZADO) {
                         c.setMotivoRechazo(motivo);
                     }
@@ -304,7 +307,7 @@ public class TorneoAdminService {
     }
 
     @Transactional
-    public InscripcionDTO expulsarEquipo(UUID torneoId, UUID equipoTorneoId, String motivo, String adminCedula) {
+    public InscripcionDTO expulsarEquipo(UUID torneoId, UUID equipoTorneoId, String motivo, UUID adminCuentaId) {
         var et = cargarInscripcion(torneoId, equipoTorneoId);
         if (et.getEstadoInscripcion() == EstadoInscripcion.EXPULSADO) {
             return toInscripcionDTO(et);
@@ -316,7 +319,7 @@ public class TorneoAdminService {
             throw new RuntimeException("El motivo de la descalificación es obligatorio.");
         }
         et.setEstadoInscripcion(EstadoInscripcion.EXPULSADO);
-        et.setExpulsadoPor(adminCedula != null ? adminCedula : "ADMIN");
+        et.setExpulsadoPorCuentaId(adminCuentaId);
         et.setFechaExpulsion(LocalDateTime.now());
         et.setMotivoExpulsion(motivo.trim());
         equipoTorneoRepo.save(et);
@@ -523,12 +526,14 @@ public class TorneoAdminService {
                 .torneoNombre(et.getTorneo().getNombre())
                 .equipoId(et.getEquipo().getId())
                 .equipoNombre(et.getEquipo().getNombre())
-                .delegadoCedula(et.getDelegadoCedula())
+                .delegadoPersonaId(et.getDelegadoPersonaId())
+                .delegadoNombre(directorioPersonas.buscar(et.getDelegadoPersonaId())
+                        .map(PersonaResumen::nombreCompleto).orElse(null))
                 .estadoInscripcion(et.getEstadoInscripcion().name())
-                .aprobadoPor(et.getAprobadoPor())
+                .aprobadoPor(directorioPersonas.nombreDeCuenta(et.getAprobadoPorCuentaId()))
                 .motivoRechazo(et.getMotivoRechazo())
                 .fechaInscripcion(et.getFechaInscripcion())
-                .expulsadoPor(et.getExpulsadoPor())
+                .expulsadoPor(directorioPersonas.nombreDeCuenta(et.getExpulsadoPorCuentaId()))
                 .fechaExpulsion(et.getFechaExpulsion())
                 .motivoExpulsion(et.getMotivoExpulsion())
                 .montoInscripcion(et.getTorneo().getMontoInscripcion())

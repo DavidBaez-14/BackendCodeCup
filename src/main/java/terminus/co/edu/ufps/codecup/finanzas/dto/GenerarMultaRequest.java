@@ -21,8 +21,8 @@ public class GenerarMultaRequest {
     @NotNull
     private UUID torneoId;
 
-    @NotBlank
-    private String cedulaJugador;
+    @NotNull
+    private UUID personaId;
 
     @NotBlank
     private String tipoSancion;  // AMARILLA | AZUL | ROJA | ACUMULACION_AMARILLAS | ROJA_DIRECTA

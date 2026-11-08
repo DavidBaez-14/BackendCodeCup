@@ -6,6 +6,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import terminus.co.edu.ufps.codecup.finanzas.dto.*;
 import terminus.co.edu.ufps.codecup.finanzas.service.MultaService;
+import terminus.co.edu.ufps.codecup.shared.security.JwtClaims;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,7 +24,7 @@ public class MultaController {
     @GetMapping("/mias")
     @PreAuthorize("hasRole('JUGADOR')")
     public ResponseEntity<List<MultaDTO>> misMultas(@AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok(multaService.misMultas(jwt.getClaimAsString("cedula")));
+        return ResponseEntity.ok(multaService.misMultas(JwtClaims.personaId(jwt)));
     }
 
     @GetMapping("/activas")
@@ -71,9 +72,9 @@ public class MultaController {
                 .values().stream().toList();
 
         var desgloseArbitro = pagadas.stream()
-                .filter(m -> m.getPagadoPorCedula() != null)
+                .filter(m -> m.getPagadoPorCuentaId() != null)
                 .collect(java.util.stream.Collectors.groupingBy(
-                        MultaDTO::getPagadoPorCedula,
+                        MultaDTO::getPagadoPorCuentaId,
                         java.util.stream.Collectors.collectingAndThen(
                                 java.util.stream.Collectors.toList(),
                                 list -> {
@@ -81,7 +82,8 @@ public class MultaController {
                                             .map(m -> m.getMonto() != null ? m.getMonto() : java.math.BigDecimal.ZERO)
                                             .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
                                     return BolsaMultasDTO.DesgloseArbitro.builder()
-                                            .pagadoPorCedula(list.get(0).getPagadoPorCedula())
+                                            .pagadoPorCuentaId(list.get(0).getPagadoPorCuentaId())
+                                            .pagadoPor(list.get(0).getPagadoPor())
                                             .total(total)
                                             .cantidad((long) list.size())
                                             .build();
@@ -102,30 +104,30 @@ public class MultaController {
         return ResponseEntity.ok(multaService.generar(req));
     }
 
-    @GetMapping("/elegibilidad/{cedula}")
+    @GetMapping("/elegibilidad/{personaId}")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR','DELEGADO','ARBITRO') or hasAuthority('SCOPE_internal')")
-    public ResponseEntity<Boolean> elegible(@PathVariable String cedula) {
-        return ResponseEntity.ok(!multaService.jugadorTieneDeudas(cedula));
+    public ResponseEntity<Boolean> elegible(@PathVariable UUID personaId) {
+        return ResponseEntity.ok(!multaService.jugadorTieneDeudas(personaId));
     }
 
-    @GetMapping("/elegibilidad/{cedula}/detalle")
+    @GetMapping("/elegibilidad/{personaId}/detalle")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR','ARBITRO')")
     public ResponseEntity<ElegibilidadResponse> elegibilidadDetalle(
-            @PathVariable String cedula,
+            @PathVariable UUID personaId,
             @RequestParam UUID torneoId) {
-        var el = multaService.consultarElegibilidad(cedula, torneoId);
+        var el = multaService.consultarElegibilidad(personaId, torneoId);
         return ResponseEntity.ok(ElegibilidadResponse.builder()
                 .apto(el.apto())
                 .motivos(el.motivos())
                 .build());
     }
 
-    @GetMapping("/jugador/{cedula}/pendientes")
+    @GetMapping("/jugador/{personaId}/pendientes")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR','ARBITRO')")
     public ResponseEntity<List<MultaDTO>> pendientesJugador(
-            @PathVariable String cedula,
+            @PathVariable UUID personaId,
             @RequestParam UUID torneoId) {
-        return ResponseEntity.ok(multaService.multasPendientesJugador(cedula, torneoId));
+        return ResponseEntity.ok(multaService.multasPendientesJugador(personaId, torneoId));
     }
 
     @PostMapping("/{multaId}/registrar-pago")
@@ -135,29 +137,29 @@ public class MultaController {
             @RequestBody RegistrarPagoTodasRequest req,
             @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(multaService.registrarPago(
-                multaId, req.getPartidoPagoId(), jwt.getClaimAsString("cedula")));
+                multaId, req.getPartidoPagoId(), JwtClaims.cuentaId(jwt)));
     }
 
-    @PostMapping("/jugador/{cedula}/registrar-pago-todas")
+    @PostMapping("/jugador/{personaId}/registrar-pago-todas")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR','ARBITRO')")
     public ResponseEntity<RegistrarPagoResult> registrarPagoTodas(
-            @PathVariable String cedula,
+            @PathVariable UUID personaId,
             @Valid @RequestBody RegistrarPagoTodasRequest req,
             @AuthenticationPrincipal Jwt jwt) {
         var result = multaService.registrarPagoTodas(
-                cedula, req.getTorneoId(), req.getPartidoPagoId(), jwt.getClaimAsString("cedula"));
+                personaId, req.getTorneoId(), req.getPartidoPagoId(), JwtClaims.cuentaId(jwt));
         return ResponseEntity.ok(RegistrarPagoResult.builder()
                 .totalPagado(result.totalPagado())
                 .multasPagadasIds(result.multasPagadasIds())
                 .build());
     }
 
-    @GetMapping("/cedula/{cedula}/suspensiones")
+    @GetMapping("/jugador/{personaId}/suspensiones")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR','ARBITRO')")
     public ResponseEntity<List<MultaDTO>> suspensiones(
-            @PathVariable String cedula,
+            @PathVariable UUID personaId,
             @RequestParam UUID torneoId) {
-        return ResponseEntity.ok(multaService.suspensionesActivas(cedula, torneoId));
+        return ResponseEntity.ok(multaService.suspensionesActivas(personaId, torneoId));
     }
 
     @GetMapping("/partido/{partidoId}/bloqueados")
@@ -173,7 +175,7 @@ public class MultaController {
             @Valid @RequestBody HabilitarExcepcionRequest req,
             @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(multaService.habilitarExcepcion(
-                multaId, req.getMotivo(), jwt.getClaimAsString("cedula")));
+                multaId, req.getMotivo(), JwtClaims.cuentaId(jwt)));
     }
 
     @PostMapping("/{id}/habilitar")
@@ -182,6 +184,6 @@ public class MultaController {
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(multaService.habilitarExcepcion(
-                id, "Habilitacion legacy", jwt.getClaimAsString("cedula")));
+                id, "Habilitacion legacy", JwtClaims.cuentaId(jwt)));
     }
 }

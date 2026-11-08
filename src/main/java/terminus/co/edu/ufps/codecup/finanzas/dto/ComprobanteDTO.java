@@ -16,7 +16,8 @@ public class ComprobanteDTO {
     private String tipo;
     private UUID referenciaId;
     private String urlArchivo;
-    private String cedulaUploader;
+    /** Nombre de quien lo subió. */
+    private String subidoPor;
     private String estado;
     private String motivoRechazo;
     private String aprobadoPor;

@@ -12,6 +12,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
+import terminus.co.edu.ufps.codecup.shared.security.JwtClaims;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -27,32 +29,32 @@ public class SolicitudController {
     public ResponseEntity<SolicitudDTO> crear(
             @RequestBody SolicitudRequestDTO req,
             @AuthenticationPrincipal Jwt jwt) {
-        String cedula = jwt.getClaimAsString("cedula");
-        return ResponseEntity.ok(solicitudService.crear(cedula, req.getEquipoTorneoId()));
+        UUID personaId = JwtClaims.personaId(jwt);
+        return ResponseEntity.ok(solicitudService.crear(personaId, req.getEquipoTorneoId()));
     }
 
     @GetMapping("/mis-solicitudes")
     @PreAuthorize("hasRole('JUGADOR')")
     public ResponseEntity<List<SolicitudDTO>> misSolicitudes(@AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok(solicitudService.listarSolicitudesJugador(jwt.getClaimAsString("cedula")));
+        return ResponseEntity.ok(solicitudService.listarSolicitudesJugador(JwtClaims.personaId(jwt)));
     }
 
     @GetMapping
     @PreAuthorize("hasRole('DELEGADO')")
     public ResponseEntity<List<SolicitudDTO>> listarSolicitudes(@AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok(solicitudService.listarSolicitudesDelegado(jwt.getClaimAsString("cedula")));
+        return ResponseEntity.ok(solicitudService.listarSolicitudesDelegado(JwtClaims.personaId(jwt)));
     }
 
     @GetMapping("/pendientes")
     @PreAuthorize("hasRole('DELEGADO')")
     public ResponseEntity<List<SolicitudDTO>> listarPendientes(@AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok(solicitudService.listarPendientesDelegado(jwt.getClaimAsString("cedula")));
+        return ResponseEntity.ok(solicitudService.listarPendientesDelegado(JwtClaims.personaId(jwt)));
     }
 
     @PostMapping("/{id}/aprobar")
     @PreAuthorize("hasRole('DELEGADO')")
     public ResponseEntity<SolicitudDTO> aprobar(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok(solicitudService.aprobar(id, jwt.getClaimAsString("cedula")));
+        return ResponseEntity.ok(solicitudService.aprobar(id, JwtClaims.personaId(jwt)));
     }
 
     @PostMapping("/{id}/rechazar")
@@ -61,6 +63,6 @@ public class SolicitudController {
             @PathVariable UUID id,
             @RequestBody RechazoRequestDTO req,
             @AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok(solicitudService.rechazar(id, req.getMotivo(), jwt.getClaimAsString("cedula")));
+        return ResponseEntity.ok(solicitudService.rechazar(id, req.getMotivo(), JwtClaims.personaId(jwt)));
     }
 }

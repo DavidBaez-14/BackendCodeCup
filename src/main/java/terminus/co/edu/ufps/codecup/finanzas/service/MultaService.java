@@ -24,6 +24,8 @@ import terminus.co.edu.ufps.codecup.finanzas.model.Multa;
 import terminus.co.edu.ufps.codecup.finanzas.model.TipoSancion;
 import terminus.co.edu.ufps.codecup.finanzas.repository.MultaRepository;
 import terminus.co.edu.ufps.codecup.notificaciones.NotificacionPublisher;
+import terminus.co.edu.ufps.codecup.identidad.api.DirectorioPersonas;
+import terminus.co.edu.ufps.codecup.identidad.api.PersonaResumen;
 
 @Slf4j
 @Service
@@ -35,6 +37,7 @@ public class MultaService {
     private final EventoPartidoRepository eventoRepo;
     private final MultaConfigRepository multaConfigRepo;
     private final NotificacionPublisher notificacionPublisher;
+    private final DirectorioPersonas directorioPersonas;
 
     @Transactional
     public void generarPorPartido(UUID partidoId) {
@@ -56,7 +59,7 @@ public class MultaService {
         var eventos = eventoRepo.findByPartidoIdOrderByOrdenAsc(partidoId);
         for (var ev : eventos) {
             if (ev.getTipoEvento() == TipoEvento.GOL) continue;
-            if (ev.getCedula() == null || ev.getCedula().isBlank()) continue;
+            if (ev.getPersonaId() == null) continue;
 
             TipoSancion tipoSancion = mapTipoSancion(ev.getTipoEvento());
             BigDecimal monto = calcularMonto(tipoSancion, cfg);
@@ -64,7 +67,7 @@ public class MultaService {
                     ? cfg.getFechasSuspensionRoja() : 0;
 
             var multa = Multa.builder()
-                    .cedula(ev.getCedula())
+                    .personaId(ev.getPersonaId())
                     .partidoId(partidoId)
                     .equipoTorneoId(ev.getEquipoTorneo().getId())
                     .torneoId(partido.getTorneo().getId())
@@ -77,11 +80,11 @@ public class MultaService {
 
             if (tipoSancion == TipoSancion.ROJA || tipoSancion == TipoSancion.ROJA_DIRECTA) {
                 notificacionPublisher.notificarRojaSuspendida(
-                        ev.getCedula(), partidoId, suspension);
+                        ev.getPersonaId(), partidoId, suspension);
             }
 
-            log.info("[FINANZAS] Multa {} generada para cedula={} tipo={} monto={}",
-                    multa.getId(), multa.getCedula(), tipoSancion, monto);
+            log.info("[FINANZAS] Multa {} generada para persona={} tipo={} monto={}",
+                    multa.getId(), multa.getPersonaId(), tipoSancion, monto);
         }
     }
 
@@ -100,7 +103,7 @@ public class MultaService {
                 ? config.map(c -> c.getFechasSuspensionRoja()).orElse(1) : 0;
 
         var multa = Multa.builder()
-                .cedula(req.getCedulaJugador())
+                .personaId(req.getPersonaId())
                 .partidoId(req.getPartidoId())
                 .equipoTorneoId(req.getEquipoTorneoId())
                 .torneoId(req.getTorneoId())
@@ -113,17 +116,17 @@ public class MultaService {
 
         if (tipo == TipoSancion.ROJA || tipo == TipoSancion.ROJA_DIRECTA) {
             notificacionPublisher.notificarRojaSuspendida(
-                    req.getCedulaJugador(), req.getPartidoId(), suspension);
+                    req.getPersonaId(), req.getPartidoId(), suspension);
         }
 
-        log.info("[FINANZAS] Multa {} generada para cedula={} tipo={} monto={}",
-                multa.getId(), multa.getCedula(), tipo, monto);
+        log.info("[FINANZAS] Multa {} generada para persona={} tipo={} monto={}",
+                multa.getId(), multa.getPersonaId(), tipo, monto);
         return toDTO(multa);
     }
 
     @Transactional(readOnly = true)
-    public List<MultaDTO> misMultas(String cedula) {
-        return multaRepo.findByCedula(cedula).stream().map(this::toDTO).toList();
+    public List<MultaDTO> misMultas(UUID personaId) {
+        return multaRepo.findByPersonaId(personaId).stream().map(this::toDTO).toList();
     }
 
     @Transactional(readOnly = true)
@@ -138,28 +141,28 @@ public class MultaService {
     }
 
     @Transactional(readOnly = true)
-    public List<MultaDTO> multasPendientesJugador(String cedula, UUID torneoId) {
-        return multaRepo.findByCedulaAndTorneoIdAndEstado(cedula, torneoId, EstadoMulta.PENDIENTE)
+    public List<MultaDTO> multasPendientesJugador(UUID personaId, UUID torneoId) {
+        return multaRepo.findByPersonaIdAndTorneoIdAndEstado(personaId, torneoId, EstadoMulta.PENDIENTE)
                 .stream().map(this::toDTO).toList();
     }
 
     @Transactional(readOnly = true)
-    public boolean jugadorTieneDeudas(String cedula) {
-        return multaRepo.countByCedulaAndEstado(cedula, EstadoMulta.PENDIENTE) > 0
-                || multaRepo.countByCedulaAndEstado(cedula, EstadoMulta.EN_REVISION) > 0;
+    public boolean jugadorTieneDeudas(UUID personaId) {
+        return multaRepo.countByPersonaIdAndEstado(personaId, EstadoMulta.PENDIENTE) > 0
+                || multaRepo.countByPersonaIdAndEstado(personaId, EstadoMulta.EN_REVISION) > 0;
     }
 
     @Transactional(readOnly = true)
-    public ElegibilidadDTO consultarElegibilidad(String cedula, UUID torneoId) {
+    public ElegibilidadDTO consultarElegibilidad(UUID personaId, UUID torneoId) {
         List<String> motivos = new ArrayList<>();
 
-        boolean suspensionActiva = multaRepo.existsByCedulaAndTorneoIdAndTipoSancionAndPartidosSuspensionRestantesGreaterThanAndHabilitadoManualFalse(
-                cedula, torneoId);
+        boolean suspensionActiva = multaRepo.existsByPersonaIdAndTorneoIdAndTipoSancionAndPartidosSuspensionRestantesGreaterThanAndHabilitadoManualFalse(
+                personaId, torneoId);
         if (suspensionActiva) {
             motivos.add("SUSPENSION_ACTIVA");
         }
 
-        boolean multaPendiente = multaRepo.existsByCedulaAndTorneoIdAndEstado(cedula, torneoId, EstadoMulta.PENDIENTE);
+        boolean multaPendiente = multaRepo.existsByPersonaIdAndTorneoIdAndEstado(personaId, torneoId, EstadoMulta.PENDIENTE);
         if (multaPendiente) {
             motivos.add("MULTA_PENDIENTE");
         }
@@ -168,30 +171,30 @@ public class MultaService {
     }
 
     @Transactional
-    public MultaDTO registrarPago(UUID multaId, UUID partidoPagoId, String cedulaArbitro) {
+    public MultaDTO registrarPago(UUID multaId, UUID partidoPagoId, UUID cuentaActor) {
         var multa = multaRepo.findById(multaId)
                 .orElseThrow(() -> new ResourceNotFoundException("Multa no encontrada."));
 
         if (multa.getEstado() == EstadoMulta.PAGADA) {
-            var pagador = multa.getPagadoPorCedula() != null ? multa.getPagadoPorCedula() : "desconocido";
+            var pagador = java.util.Objects.requireNonNullElse(directorioPersonas.nombreDeCuenta(multa.getPagadoPorCuentaId()), "desconocido");
             throw new IllegalStateException(
                     "Esta multa ya fue pagada por " + pagador + " el dia " + multa.getFechaPago());
         }
 
         multa.setEstado(EstadoMulta.PAGADA);
-        multa.setPagadoPorCedula(cedulaArbitro);
+        multa.setPagadoPorCuentaId(cuentaActor);
         multa.setPartidoPagoId(partidoPagoId);
         multa.setFechaPago(LocalDateTime.now());
         multaRepo.save(multa);
 
         log.info("[FINANZAS] Multa {} PAGADA por {} en partido {}",
-                multaId, cedulaArbitro, partidoPagoId);
+                multaId, cuentaActor, partidoPagoId);
         return toDTO(multa);
     }
 
     @Transactional
-    public RegistrarPagoTodasResult registrarPagoTodas(String cedula, UUID torneoId, UUID partidoPagoId, String cedulaArbitro) {
-        var pendientes = multaRepo.findByCedulaAndTorneoIdAndEstado(cedula, torneoId, EstadoMulta.PENDIENTE);
+    public RegistrarPagoTodasResult registrarPagoTodas(UUID personaId, UUID torneoId, UUID partidoPagoId, UUID cuentaActor) {
+        var pendientes = multaRepo.findByPersonaIdAndTorneoIdAndEstado(personaId, torneoId, EstadoMulta.PENDIENTE);
         if (pendientes.isEmpty()) {
             throw new RuntimeException("El jugador no tiene multas pendientes en este torneo.");
         }
@@ -201,7 +204,7 @@ public class MultaService {
 
         for (var multa : pendientes) {
             multa.setEstado(EstadoMulta.PAGADA);
-            multa.setPagadoPorCedula(cedulaArbitro);
+            multa.setPagadoPorCuentaId(cuentaActor);
             multa.setPartidoPagoId(partidoPagoId);
             multa.setFechaPago(LocalDateTime.now());
             multaRepo.save(multa);
@@ -209,14 +212,14 @@ public class MultaService {
             pagadas.add(multa.getId());
         }
 
-        log.info("[FINANZAS] Pago total de {} para cedula={} en torneo={}: {} multas, total={}",
-                cedulaArbitro, cedula, torneoId, pagadas.size(), totalPagado);
+        log.info("[FINANZAS] Pago total de {} para persona={} en torneo={}: {} multas, total={}",
+                cuentaActor, personaId, torneoId, pagadas.size(), totalPagado);
 
         return new RegistrarPagoTodasResult(totalPagado, pagadas);
     }
 
     @Transactional
-    public MultaDTO habilitarExcepcion(UUID multaId, String motivo, String cedulaAdmin) {
+    public MultaDTO habilitarExcepcion(UUID multaId, String motivo, UUID cuentaAdmin) {
         var multa = multaRepo.findById(multaId)
                 .orElseThrow(() -> new ResourceNotFoundException("Multa no encontrada."));
 
@@ -226,13 +229,13 @@ public class MultaService {
         }
 
         multa.setHabilitadoManual(true);
-        multa.setHabilitadoPorCedula(cedulaAdmin);
+        multa.setHabilitadoPorCuentaId(cuentaAdmin);
         multa.setHabilitadoEn(LocalDateTime.now());
         multa.setMotivoHabilitacion(motivo);
         multaRepo.save(multa);
 
         log.info("[FINANZAS] Excepcion habilitada para multa {} por {}: {}",
-                multaId, cedulaAdmin, motivo);
+                multaId, cuentaAdmin, motivo);
         return toDTO(multa);
     }
 
@@ -252,8 +255,8 @@ public class MultaService {
     }
 
     @Transactional(readOnly = true)
-    public List<MultaDTO> suspensionesActivas(String cedula, UUID torneoId) {
-        return multaRepo.findSuspensionesActivas(cedula, torneoId).stream()
+    public List<MultaDTO> suspensionesActivas(UUID personaId, UUID torneoId) {
+        return multaRepo.findSuspensionesActivas(personaId, torneoId).stream()
                 .map(this::toDTO).toList();
     }
 
@@ -271,7 +274,7 @@ public class MultaService {
             var jugadores = multaRepo.findJugadoresBloqueados(equipoTorneoId, torneoId);
             for (Object[] row : jugadores) {
                 bloqueados.add(new JugadorBloqueadoDTO(
-                        (String) row[0],
+                        (UUID) row[0],
                         (UUID) row[1],
                         (Boolean) row[2],
                         (Boolean) row[3]));
@@ -302,7 +305,8 @@ public class MultaService {
     private MultaDTO toDTO(Multa m) {
         return MultaDTO.builder()
                 .id(m.getId())
-                .cedula(m.getCedula())
+                .personaId(m.getPersonaId())
+                .jugadorNombre(directorioPersonas.buscar(m.getPersonaId()).map(PersonaResumen::nombreCompleto).orElse(null))
                 .partidoId(m.getPartidoId())
                 .equipoTorneoId(m.getEquipoTorneoId())
                 .torneoId(m.getTorneoId())
@@ -311,10 +315,11 @@ public class MultaService {
                 .estado(m.getEstado().name())
                 .partidosSuspension(m.getPartidosSuspension())
                 .partidosSuspensionRestantes(m.getPartidosSuspensionRestantes())
-                .pagadoPorCedula(m.getPagadoPorCedula())
+                .pagadoPorCuentaId(m.getPagadoPorCuentaId())
+                .pagadoPor(directorioPersonas.nombreDeCuenta(m.getPagadoPorCuentaId()))
                 .partidoPagoId(m.getPartidoPagoId())
                 .habilitadoManual(m.getHabilitadoManual())
-                .habilitadoPorCedula(m.getHabilitadoPorCedula())
+                .habilitadoPor(directorioPersonas.nombreDeCuenta(m.getHabilitadoPorCuentaId()))
                 .habilitadoEn(m.getHabilitadoEn())
                 .motivoHabilitacion(m.getMotivoHabilitacion())
                 .fechaGeneracion(m.getFechaGeneracion())
@@ -330,5 +335,5 @@ public class MultaService {
 
     public record RegistrarPagoTodasResult(BigDecimal totalPagado, List<UUID> multasPagadasIds) {}
 
-    public record JugadorBloqueadoDTO(String cedula, UUID equipoTorneoId, boolean suspensionActiva, boolean multaPendiente) {}
+    public record JugadorBloqueadoDTO(UUID personaId, UUID equipoTorneoId, boolean suspensionActiva, boolean multaPendiente) {}
 }

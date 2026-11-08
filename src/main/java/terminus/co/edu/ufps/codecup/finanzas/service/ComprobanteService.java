@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import terminus.co.edu.ufps.codecup.identidad.api.DirectorioPersonas;
 import terminus.co.edu.ufps.codecup.shared.error.ApiException;
 import terminus.co.edu.ufps.codecup.shared.error.ResourceNotFoundException;
 import terminus.co.edu.ufps.codecup.competicion.model.EquipoTorneo;
@@ -29,9 +30,10 @@ public class ComprobanteService {
     private final ComprobanteRepository comprobanteRepo;
     private final EquipoTorneoRepository equipoTorneoRepo;
     private final MultaRepository multaRepo;
+    private final DirectorioPersonas directorioPersonas;
 
     @Transactional
-    public ComprobanteDTO subir(SubirComprobanteRequest req, String cedulaUploader) {
+    public ComprobanteDTO subir(SubirComprobanteRequest req, UUID personaUploader, UUID cuentaUploader) {
         TipoComprobante tipo;
         try {
             tipo = TipoComprobante.valueOf(req.getTipo());
@@ -43,7 +45,7 @@ public class ComprobanteService {
         if (tipo == TipoComprobante.INSCRIPCION) {
             var et = equipoTorneoRepo.findById(req.getReferenciaId())
                     .orElseThrow(() -> new ResourceNotFoundException("EquipoTorneo no encontrado."));
-            if (!esDelegado(et, cedulaUploader)) {
+            if (!esDelegado(et, personaUploader)) {
                 throw inscripcionAjena();
             }
             equipoTorneoDelArchivo = et.getId();
@@ -59,7 +61,7 @@ public class ComprobanteService {
                     .orElseThrow(() -> new ResourceNotFoundException("Multa no encontrada."));
             var et = equipoTorneoRepo.findById(multa.getEquipoTorneoId())
                     .orElseThrow(() -> new ResourceNotFoundException("Equipo de la multa no encontrado."));
-            if (!esDelegado(et, cedulaUploader)) {
+            if (!esDelegado(et, personaUploader)) {
                 throw ApiException.forbidden("MULTA_AJENA", "No eres el delegado del equipo de esta multa.");
             }
             if (multa.getEstado() == EstadoMulta.PAGADA) {
@@ -85,18 +87,18 @@ public class ComprobanteService {
         c.setTipo(tipo);
         c.setReferenciaId(req.getReferenciaId());
         c.setUrlArchivo(req.getUrlArchivo());
-        c.setCedulaUploader(cedulaUploader);
+        c.setSubidoPorCuentaId(cuentaUploader);
         // Reset del ciclo de revision. Se setean siempre porque con new Comprobante()
         // los @Builder.Default (estado/fechaSubida) NO se aplican.
         c.setEstado(EstadoComprobante.PENDIENTE_REVISION);
         c.setMotivoRechazo(null);
-        c.setAprobadoPor(null);
+        c.setResueltoPorCuentaId(null);
         c.setFechaResolucion(null);
         c.setFechaSubida(LocalDateTime.now());
         comprobanteRepo.save(c);
 
         log.info("[FINANZAS] Comprobante {} subido/reemplazado por {} para referencia {}",
-                c.getId(), cedulaUploader, c.getReferenciaId());
+                c.getId(), cuentaUploader, c.getReferenciaId());
         return toDTO(c);
     }
 
@@ -107,13 +109,13 @@ public class ComprobanteService {
     }
 
     @Transactional(readOnly = true)
-    public List<ComprobanteDTO> misComprobantes(String cedulaUploader) {
-        return comprobanteRepo.findByCedulaUploaderOrderByFechaSubidaDesc(cedulaUploader)
+    public List<ComprobanteDTO> misComprobantes(UUID cuentaUploader) {
+        return comprobanteRepo.findBySubidoPorCuentaIdOrderByFechaSubidaDesc(cuentaUploader)
                 .stream().map(this::toDTO).toList();
     }
 
     @Transactional
-    public ComprobanteDTO aprobar(UUID comprobanteId, String cedulaAdmin) {
+    public ComprobanteDTO aprobar(UUID comprobanteId, UUID cuentaAdmin) {
         var c = comprobanteRepo.findById(comprobanteId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comprobante no encontrado."));
         if (c.getEstado() != EstadoComprobante.PENDIENTE_REVISION) {
@@ -132,7 +134,7 @@ public class ComprobanteService {
                                 + "); no se puede aprobar este comprobante.");
             }
             et.setEstadoInscripcion(EstadoInscripcion.APROBADO);
-            et.setAprobadoPor(cedulaAdmin);
+            et.setAprobadoPorCuentaId(cuentaAdmin);
             equipoTorneoRepo.save(et);
             log.info("[FINANZAS] Inscripcion {} APROBADA por comprobante {}", et.getId(), c.getId());
         } else if (c.getTipo() == TipoComprobante.MULTA) {
@@ -142,23 +144,23 @@ public class ComprobanteService {
                 throw new IllegalStateException("La multa ya estaba pagada; no se puede re-aprobar.");
             }
             multa.setEstado(EstadoMulta.PAGADA);
-            multa.setPagadoPorCedula(c.getCedulaUploader());
+            multa.setPagadoPorCuentaId(c.getSubidoPorCuentaId());
             multa.setFechaPago(LocalDateTime.now());
             multaRepo.save(multa);
             log.info("[FINANZAS] Multa {} PAGADA por comprobante {}", multa.getId(), c.getId());
         }
 
         c.setEstado(EstadoComprobante.APROBADO);
-        c.setAprobadoPor(cedulaAdmin);
+        c.setResueltoPorCuentaId(cuentaAdmin);
         c.setFechaResolucion(LocalDateTime.now());
         comprobanteRepo.save(c);
 
-        log.info("[FINANZAS] Comprobante {} APROBADO por {}", c.getId(), cedulaAdmin);
+        log.info("[FINANZAS] Comprobante {} APROBADO por {}", c.getId(), cuentaAdmin);
         return toDTO(c);
     }
 
     @Transactional
-    public ComprobanteDTO rechazar(UUID comprobanteId, String motivo, String cedulaAdmin) {
+    public ComprobanteDTO rechazar(UUID comprobanteId, String motivo, UUID cuentaAdmin) {
         var c = comprobanteRepo.findById(comprobanteId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comprobante no encontrado."));
         if (c.getEstado() != EstadoComprobante.PENDIENTE_REVISION) {
@@ -166,11 +168,11 @@ public class ComprobanteService {
         }
         c.setEstado(EstadoComprobante.RECHAZADO);
         c.setMotivoRechazo(motivo);
-        c.setAprobadoPor(cedulaAdmin);
+        c.setResueltoPorCuentaId(cuentaAdmin);
         c.setFechaResolucion(LocalDateTime.now());
         comprobanteRepo.save(c);
 
-        log.info("[FINANZAS] Comprobante {} RECHAZADO por {}: {}", c.getId(), cedulaAdmin, motivo);
+        log.info("[FINANZAS] Comprobante {} RECHAZADO por {}: {}", c.getId(), cuentaAdmin, motivo);
         return toDTO(c);
     }
 
@@ -181,10 +183,10 @@ public class ComprobanteService {
      * suyo ya aprobado (la evidencia que reviso el admin).
      */
     @Transactional(readOnly = true)
-    public void validarSubidaPropia(UUID equipoTorneoId, String cedulaDelegado) {
+    public void validarSubidaPropia(UUID equipoTorneoId, UUID personaDelegado) {
         var et = equipoTorneoRepo.findById(equipoTorneoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Inscripcion no encontrada."));
-        if (!esDelegado(et, cedulaDelegado)) {
+        if (!esDelegado(et, personaDelegado)) {
             throw inscripcionAjena();
         }
         if (et.getEstadoInscripcion() != EstadoInscripcion.PENDIENTE_PAGO) {
@@ -201,10 +203,10 @@ public class ComprobanteService {
      * @return la clave del archivo en Storage
      */
     @Transactional(readOnly = true)
-    public String archivoParaDescarga(UUID comprobanteId, String cedula, boolean esAdmin) {
+    public String archivoParaDescarga(UUID comprobanteId, UUID persona, boolean esAdmin) {
         var c = comprobanteRepo.findById(comprobanteId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comprobante no encontrado."));
-        if (!esAdmin && !esDelegado(equipoDelComprobante(c), cedula)) {
+        if (!esAdmin && !esDelegado(equipoDelComprobante(c), persona)) {
             throw ApiException.forbidden("COMPROBANTE_AJENO", "Este comprobante no es de tu equipo.");
         }
         return c.getUrlArchivo();
@@ -220,8 +222,8 @@ public class ComprobanteService {
         return equipoTorneoId == null ? null : equipoTorneoRepo.findById(equipoTorneoId).orElse(null);
     }
 
-    private static boolean esDelegado(EquipoTorneo et, String cedula) {
-        return et != null && cedula != null && cedula.equals(et.getDelegadoCedula());
+    private static boolean esDelegado(EquipoTorneo et, UUID persona) {
+        return et != null && persona != null && persona.equals(et.getDelegadoPersonaId());
     }
 
     /** Solo claves dentro de la carpeta del equipo, sin saltos de ruta. */
@@ -242,10 +244,10 @@ public class ComprobanteService {
                 .tipo(c.getTipo().name())
                 .referenciaId(c.getReferenciaId())
                 .urlArchivo(c.getUrlArchivo())
-                .cedulaUploader(c.getCedulaUploader())
+                .subidoPor(directorioPersonas.nombreDeCuenta(c.getSubidoPorCuentaId()))
                 .estado(c.getEstado().name())
                 .motivoRechazo(c.getMotivoRechazo())
-                .aprobadoPor(c.getAprobadoPor())
+                .aprobadoPor(directorioPersonas.nombreDeCuenta(c.getResueltoPorCuentaId()))
                 .fechaSubida(c.getFechaSubida())
                 .fechaResolucion(c.getFechaResolucion())
                 .build();

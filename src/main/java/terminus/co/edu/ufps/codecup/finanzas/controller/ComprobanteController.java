@@ -7,6 +7,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import terminus.co.edu.ufps.codecup.finanzas.dto.*;
 import terminus.co.edu.ufps.codecup.finanzas.service.ComprobanteService;
+import terminus.co.edu.ufps.codecup.shared.security.JwtClaims;
 import terminus.co.edu.ufps.codecup.finanzas.service.StorageService;
 
 import org.springframework.http.ResponseEntity;
@@ -30,7 +31,7 @@ public class ComprobanteController {
     public ResponseEntity<UploadUrlResponse> solicitarUploadUrl(
             @Valid @RequestBody SolicitudUploadUrlRequest req,
             @AuthenticationPrincipal Jwt jwt) {
-        comprobanteService.validarSubidaPropia(req.getEquipoTorneoId(), jwt.getClaimAsString("cedula"));
+        comprobanteService.validarSubidaPropia(req.getEquipoTorneoId(), JwtClaims.personaId(jwt));
         var result = storageService.generarUploadUrl(req.getEquipoTorneoId());
         return ResponseEntity.ok(UploadUrlResponse.builder()
                 .uploadUrl(result.uploadUrl())
@@ -47,7 +48,7 @@ public class ComprobanteController {
             Authentication auth) {
         boolean esAdmin = auth.getAuthorities().stream()
                 .anyMatch(a -> "ROLE_ADMINISTRADOR".equals(a.getAuthority()));
-        String fileKey = comprobanteService.archivoParaDescarga(id, jwt.getClaimAsString("cedula"), esAdmin);
+        String fileKey = comprobanteService.archivoParaDescarga(id, JwtClaims.personaId(jwt), esAdmin);
         return ResponseEntity.ok(Map.of("url", storageService.generarDownloadUrl(fileKey)));
     }
 
@@ -56,13 +57,13 @@ public class ComprobanteController {
     public ResponseEntity<ComprobanteDTO> subir(
             @Valid @RequestBody SubirComprobanteRequest req,
             @AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok(comprobanteService.subir(req, jwt.getClaimAsString("cedula")));
+        return ResponseEntity.ok(comprobanteService.subir(req, JwtClaims.personaId(jwt), JwtClaims.cuentaId(jwt)));
     }
 
     @GetMapping("/mis-comprobantes")
     @PreAuthorize("hasRole('DELEGADO')")
     public ResponseEntity<List<ComprobanteDTO>> misComprobantes(@AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok(comprobanteService.misComprobantes(jwt.getClaimAsString("cedula")));
+        return ResponseEntity.ok(comprobanteService.misComprobantes(JwtClaims.cuentaId(jwt)));
     }
 
     @GetMapping("/pendientes")
@@ -76,7 +77,7 @@ public class ComprobanteController {
     public ResponseEntity<ComprobanteDTO> aprobar(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok(comprobanteService.aprobar(id, jwt.getClaimAsString("cedula")));
+        return ResponseEntity.ok(comprobanteService.aprobar(id, JwtClaims.cuentaId(jwt)));
     }
 
     @PostMapping("/{id}/rechazar")
@@ -85,6 +86,6 @@ public class ComprobanteController {
             @PathVariable UUID id,
             @Valid @RequestBody RechazoComprobanteRequest req,
             @AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok(comprobanteService.rechazar(id, req.getMotivo(), jwt.getClaimAsString("cedula")));
+        return ResponseEntity.ok(comprobanteService.rechazar(id, req.getMotivo(), JwtClaims.cuentaId(jwt)));
     }
 }

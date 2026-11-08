@@ -12,7 +12,7 @@ public class EquipoEnTorneoDTO {
     private UUID equipoTorneoId;
     private UUID equipoId;
     private String equipoNombre;
-    private String delegadoCedula;
+    private String delegadoNombre;
     private String estadoInscripcion;
     private Integer miembros;
 }

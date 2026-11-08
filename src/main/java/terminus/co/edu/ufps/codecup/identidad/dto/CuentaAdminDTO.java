@@ -12,7 +12,7 @@ public class CuentaAdminDTO {
 
     private UUID id;
 
-    private String cedula;
+    private String numeroDocumento;
 
     private String nombre;
 

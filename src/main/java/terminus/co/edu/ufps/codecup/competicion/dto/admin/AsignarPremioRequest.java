@@ -6,6 +6,6 @@ import java.util.UUID;
 
 @Data
 public class AsignarPremioRequest {
-    private String cedula;
+    private UUID personaId;
     private UUID equipoTorneoId;
 }

@@ -16,5 +16,5 @@ public interface ComprobanteRepository extends JpaRepository<Comprobante, UUID> 
 
     List<Comprobante> findByReferenciaId(UUID referenciaId);
 
-    List<Comprobante> findByCedulaUploaderOrderByFechaSubidaDesc(String cedulaUploader);
+    List<Comprobante> findBySubidoPorCuentaIdOrderByFechaSubidaDesc(UUID subidoPorCuentaId);
 }

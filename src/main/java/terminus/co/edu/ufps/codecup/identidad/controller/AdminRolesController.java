@@ -65,23 +65,23 @@ public class AdminRolesController {
     @PostMapping("/asignar")
     public ResponseEntity<Void> asignarRol(@Valid @RequestBody AsignarRolRequestDTO req,
                                            @AuthenticationPrincipal Jwt jwt) {
-        adminRolesService.asignarRol(req.getCedula(), req.getRol(), req.getMotivo(), JwtClaims.cuentaId(jwt));
+        adminRolesService.asignarRol(req.getCuentaId(), req.getRol(), req.getMotivo(), JwtClaims.cuentaId(jwt));
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/revocar")
     public ResponseEntity<Void> revocarRol(@Valid @RequestBody RevocarRolRequestDTO req,
                                            @AuthenticationPrincipal Jwt jwt) {
-        adminRolesService.revocarRol(req.getCedula(), req.getRol(), req.getMotivo(), JwtClaims.cuentaId(jwt));
+        adminRolesService.revocarRol(req.getCuentaId(), req.getRol(), req.getMotivo(), JwtClaims.cuentaId(jwt));
         return ResponseEntity.noContent().build();
     }
 
     /** Ruta heredada de MS1. Ahora bloquea la cuenta: el backend no borra usuarios del proveedor. */
-    @DeleteMapping("/cuenta/{cedula}")
-    public ResponseEntity<Void> eliminarCuenta(@PathVariable String cedula,
+    @DeleteMapping("/cuenta/{cuentaId}")
+    public ResponseEntity<Void> eliminarCuenta(@PathVariable UUID cuentaId,
                                                @Valid @RequestBody MotivoRequestDTO req,
                                                @AuthenticationPrincipal Jwt jwt) {
-        adminRolesService.eliminarCuenta(cedula, req.getMotivo(), JwtClaims.cuentaId(jwt));
+        adminRolesService.eliminarCuenta(cuentaId, req.getMotivo(), JwtClaims.cuentaId(jwt));
         return ResponseEntity.noContent().build();
     }
 }

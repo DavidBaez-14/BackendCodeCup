@@ -14,7 +14,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import terminus.co.edu.ufps.codecup.competicion.repository.EquipoRepository;
 import terminus.co.edu.ufps.codecup.competicion.repository.EquipoTorneoRepository;
 import terminus.co.edu.ufps.codecup.competicion.repository.JugadorEquipoRepository;
-import terminus.co.edu.ufps.codecup.competicion.repository.JugadorRepository;
+import terminus.co.edu.ufps.codecup.competicion.repository.PerfilDeportivoRepository;
 import terminus.co.edu.ufps.codecup.competicion.repository.PartidoRepository;
 import terminus.co.edu.ufps.codecup.competicion.repository.TorneoRepository;
 import terminus.co.edu.ufps.codecup.identidad.repository.CuentaRepository;
@@ -34,7 +34,7 @@ public class SeedRunner implements ApplicationRunner {
     private final PersonaRepository personas;
     private final CuentaRepository cuentas;
     private final CuentaRolRepository roles;
-    private final JugadorRepository jugadores;
+    private final PerfilDeportivoRepository perfiles;
     private final TorneoRepository torneos;
     private final EquipoRepository equipos;
     private final EquipoTorneoRepository inscripciones;
@@ -50,7 +50,7 @@ public class SeedRunner implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        var repos = new SeedService.Repositorios(personas, cuentas, roles, jugadores, torneos, equipos,
+        var repos = new SeedService.Repositorios(personas, cuentas, roles, perfiles, torneos, equipos,
                 inscripciones, planteles, partidos);
         var resumen = new SeedService(repos, supabase, contrasena, new TransactionTemplate(transacciones)).sembrar();
         log.info("[SEED] Listo: {} usuarios @prueba.local, {} torneos, {} inscripciones, {} miembros de plantel, {} partido(s).",

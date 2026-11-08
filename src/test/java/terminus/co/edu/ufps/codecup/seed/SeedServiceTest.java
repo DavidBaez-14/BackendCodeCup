@@ -22,7 +22,7 @@ import terminus.co.edu.ufps.codecup.competicion.model.Torneo;
 import terminus.co.edu.ufps.codecup.competicion.repository.EquipoRepository;
 import terminus.co.edu.ufps.codecup.competicion.repository.EquipoTorneoRepository;
 import terminus.co.edu.ufps.codecup.competicion.repository.JugadorEquipoRepository;
-import terminus.co.edu.ufps.codecup.competicion.repository.JugadorRepository;
+import terminus.co.edu.ufps.codecup.competicion.repository.PerfilDeportivoRepository;
 import terminus.co.edu.ufps.codecup.competicion.repository.PartidoRepository;
 import terminus.co.edu.ufps.codecup.competicion.repository.TorneoRepository;
 import terminus.co.edu.ufps.codecup.identidad.model.Cuenta;
@@ -43,7 +43,7 @@ class SeedServiceTest {
     @Autowired PersonaRepository personas;
     @Autowired CuentaRepository cuentas;
     @Autowired CuentaRolRepository roles;
-    @Autowired JugadorRepository jugadores;
+    @Autowired PerfilDeportivoRepository perfiles;
     @Autowired TorneoRepository torneos;
     @Autowired EquipoRepository equipos;
     @Autowired EquipoTorneoRepository inscripciones;
@@ -59,7 +59,7 @@ class SeedServiceTest {
     };
 
     private SeedService seed(String contrasena) {
-        var repos = new SeedService.Repositorios(personas, cuentas, roles, jugadores, torneos, equipos,
+        var repos = new SeedService.Repositorios(personas, cuentas, roles, perfiles, torneos, equipos,
                 inscripciones, planteles, partidos);
         return new SeedService(repos, supabaseSimulado, contrasena, new TransactionTemplate(transacciones));
     }
@@ -90,14 +90,14 @@ class SeedServiceTest {
                 .hasSize(1);
 
         // Halcones FC: delegado01 y jugador01 a jugador05.
-        var halcones = inscripciones.findByTorneoIdAndDelegadoCedula(copa.getId(), "9000000201").orElseThrow();
+        var halcones = inscripciones.findByTorneoIdAndDelegadoPersonaId(copa.getId(), persona("9000000201")).orElseThrow();
         assertThat(planteles.findByEquipoTorneoIdOrderByFechaInicioAsc(halcones.getId())).hasSize(6);
 
         // jugador14 está libre y con perfil (puede pedir unirse); jugador22 no tiene perfil deportivo.
-        assertThat(planteles.findByCedulaAndTorneoId("9000000314", copa.getId())).isEmpty();
-        assertThat(jugadores.findById("9000000314")).get()
+        assertThat(planteles.findByPersonaIdAndTorneoId(persona("9000000314"), copa.getId())).isEmpty();
+        assertThat(perfiles.findById(persona("9000000314"))).get()
                 .satisfies(j -> assertThat(j.getPosicion()).isNotBlank());
-        assertThat(jugadores.findById("9000000322")).isEmpty();
+        assertThat(perfiles.findById(persona("9000000322"))).isEmpty();
     }
 
     @Test
@@ -166,5 +166,10 @@ class SeedServiceTest {
                 .filter(t -> nombre.equals(t.getNombre()))
                 .findFirst()
                 .orElseThrow();
+    }
+
+    /** Persona de un usuario de prueba, por su documento. */
+    private UUID persona(String documento) {
+        return personas.findFirstByNumeroDocumento(documento).orElseThrow().getId();
     }
 }

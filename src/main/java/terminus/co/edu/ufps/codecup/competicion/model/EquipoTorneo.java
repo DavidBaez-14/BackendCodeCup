@@ -15,7 +15,7 @@ import java.util.UUID;
 @Table(name = "equipo_torneo", schema = "competicion",
         uniqueConstraints = {
                 @UniqueConstraint(columnNames = {"torneo_id", "equipo_id"}),
-                @UniqueConstraint(columnNames = {"torneo_id", "delegado_cedula"})
+                @UniqueConstraint(columnNames = {"torneo_id", "delegado_persona_id"})
         })
 public class EquipoTorneo {
 
@@ -31,8 +31,8 @@ public class EquipoTorneo {
     @JoinColumn(name = "equipo_id", nullable = false)
     private Equipo equipo;
 
-    @Column(name = "delegado_cedula", nullable = false, length = 20)
-    private String delegadoCedula;
+    @Column(name = "delegado_persona_id", nullable = false)
+    private UUID delegadoPersonaId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "estado_inscripcion", nullable = false, length = 20)
@@ -42,14 +42,15 @@ public class EquipoTorneo {
     @Column(name = "fecha_inscripcion", nullable = false, updatable = false)
     private LocalDateTime fechaInscripcion;
 
-    @Column(name = "aprobado_por", length = 50)
-    private String aprobadoPor;
+    /** Cuenta del admin que aprobó (spec 0022); null si la aprobó el seed. */
+    @Column(name = "aprobado_por_cuenta_id")
+    private UUID aprobadoPorCuentaId;
 
     @Column(name = "motivo_rechazo", length = 500)
     private String motivoRechazo;
 
-    @Column(name = "expulsado_por", length = 50)
-    private String expulsadoPor;
+    @Column(name = "expulsado_por_cuenta_id")
+    private UUID expulsadoPorCuentaId;
 
     @Column(name = "fecha_expulsion")
     private LocalDateTime fechaExpulsion;

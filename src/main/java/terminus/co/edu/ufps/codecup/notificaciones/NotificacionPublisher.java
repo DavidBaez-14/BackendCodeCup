@@ -8,7 +8,7 @@ import java.util.UUID;
  */
 public interface NotificacionPublisher {
 
-    void notificarRojaSuspendida(String cedula, UUID partidoId, int fechasSuspension);
+    void notificarRojaSuspendida(UUID personaId, UUID partidoId, int fechasSuspension);
 
     void notificarAsignacionRol(UUID cuentaId, String correo, String rol);
 

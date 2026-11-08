@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import terminus.co.edu.ufps.codecup.shared.error.ResourceNotFoundException;
+import terminus.co.edu.ufps.codecup.identidad.api.DirectorioPersonas;
+import terminus.co.edu.ufps.codecup.identidad.api.PersonaResumen;
 import terminus.co.edu.ufps.codecup.competicion.dto.jugador.EquipoEnTorneoDTO;
 import terminus.co.edu.ufps.codecup.competicion.model.EstadoInscripcion;
 import terminus.co.edu.ufps.codecup.competicion.model.EstadoTorneo;
@@ -28,6 +30,7 @@ public class JugadorPublicoController {
     private final TorneoRepository torneoRepo;
     private final EquipoTorneoRepository equipoTorneoRepo;
     private final JugadorEquipoRepository jugadorEquipoRepo;
+    private final DirectorioPersonas directorioPersonas;
 
     @GetMapping("/torneos/{torneoId}/equipos")
     public ResponseEntity<List<EquipoEnTorneoDTO>> equiposPorTorneo(@PathVariable UUID torneoId) {
@@ -43,7 +46,8 @@ public class JugadorPublicoController {
                         .equipoTorneoId(et.getId())
                         .equipoId(et.getEquipo().getId())
                         .equipoNombre(et.getEquipo().getNombre())
-                        .delegadoCedula(et.getDelegadoCedula())
+                        .delegadoNombre(directorioPersonas.buscar(et.getDelegadoPersonaId())
+                                .map(PersonaResumen::nombreCompleto).orElse(null))
                         .estadoInscripcion(et.getEstadoInscripcion().name())
                         .miembros(jugadorEquipoRepo.findByEquipoTorneoIdOrderByFechaInicioAsc(et.getId()).size())
                         .build())

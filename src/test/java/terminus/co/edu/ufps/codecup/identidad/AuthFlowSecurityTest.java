@@ -66,7 +66,10 @@ class AuthFlowSecurityTest extends AuthTestSupport {
         registrar(u, "CC", "1.090 555 123")
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.roles", contains("JUGADOR")))
-                .andExpect(jsonPath("$.cedula").value("1090555123"))
+                .andExpect(jsonPath("$.numeroDocumento").value("1090555123"))
+                .andExpect(jsonPath("$.personaId").isNotEmpty())
+                // Spec 0022: /me ya no trae el campo de transición "cedula".
+                .andExpect(jsonPath("$.cedula").doesNotExist())
                 .andExpect(jsonPath("$.nombre").value("Ana María Pérez"))
                 .andExpect(jsonPath("$.correo").value(u.correo()));
 
@@ -111,19 +114,22 @@ class AuthFlowSecurityTest extends AuthTestSupport {
 
     @Test
     void rolesSalenDeLaBdNoDelToken() throws Exception {
-        // Claims inventados: ninguno debe dar permisos ni suplantar la cédula.
+        // Claims inventados: ninguno debe dar permisos ni suplantar a otra persona.
         var u = usuario(Map.of(
                 "roles", List.of("ADMINISTRADOR"),
                 "app_metadata", Map.of("roles", List.of("ADMINISTRADOR")),
                 "cedula", "999",
-                "cuenta_id", "00000000-0000-0000-0000-000000000000"));
+                "cuenta_id", "00000000-0000-0000-0000-000000000000",
+                "persona_id", "00000000-0000-0000-0000-000000000000"));
         String doc = registrar(u);
 
         mvc.perform(get("/api/admin/cuentas").header("Authorization", u.bearer()))
                 .andExpect(status().isForbidden());
         mvc.perform(get("/api/supercopa/mi-perfil").header("Authorization", u.bearer()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.cedula").value(doc));
+                // Spec 0022: la persona sale de la BD, no de un claim inventado.
+                .andExpect(jsonPath("$.personaId").value(
+                        personaRepository.findFirstByNumeroDocumento(doc).orElseThrow().getId().toString()));
     }
 
     @Test

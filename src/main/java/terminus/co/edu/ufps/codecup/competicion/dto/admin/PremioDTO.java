@@ -20,7 +20,8 @@ public class PremioDTO {
     private String titulo;
     private String descripcion;
     private Integer monto;
-    private String ganadorCedula;
+    private UUID ganadorPersonaId;
+    private String ganadorNombre;
     private UUID ganadorEquipoTorneoId;
     private String ganadorEquipoNombre;
     private LocalDateTime asignadoEn;

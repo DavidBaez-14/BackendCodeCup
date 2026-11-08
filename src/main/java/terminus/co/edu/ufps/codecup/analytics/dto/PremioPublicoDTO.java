@@ -1,5 +1,6 @@
 package terminus.co.edu.ufps.codecup.analytics.dto;
 
+import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -27,7 +28,7 @@ public class PremioPublicoDTO {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class GanadorDTO {
-        private String cedula;
+        private UUID personaId;
         private String nombre;
         private String equipoNombre;
     }

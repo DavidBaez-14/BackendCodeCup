@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.RestController;
 import terminus.co.edu.ufps.codecup.analytics.dto.PremioPublicoDTO;
 import terminus.co.edu.ufps.codecup.analytics.service.CompeticionDatosService;
 
+import terminus.co.edu.ufps.codecup.identidad.api.DirectorioPersonas;
+import terminus.co.edu.ufps.codecup.identidad.api.PersonaResumen;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -19,6 +21,7 @@ import java.util.UUID;
 public class PremiosController {
 
     private final CompeticionDatosService datos;
+    private final DirectorioPersonas directorioPersonas;
 
     @GetMapping("/{torneoId}/premios")
     public ResponseEntity<List<PremioPublicoDTO>> premios(@PathVariable UUID torneoId) {
@@ -40,10 +43,11 @@ public class PremiosController {
 
     private PremioPublicoDTO.GanadorDTO buildGanador(
             terminus.co.edu.ufps.codecup.competicion.dto.admin.PremioDTO p) {
-        if (p.getGanadorCedula() == null) return null;
+        if (p.getGanadorPersonaId() == null && p.getGanadorEquipoTorneoId() == null) return null;
         return PremioPublicoDTO.GanadorDTO.builder()
-                .cedula(p.getGanadorCedula())
-                .nombre(null)
+                .personaId(p.getGanadorPersonaId())
+                .nombre(p.getGanadorPersonaId() == null ? null : directorioPersonas.buscar(p.getGanadorPersonaId())
+                        .map(PersonaResumen::nombreVisible).orElse(null))
                 .equipoNombre(p.getGanadorEquipoNombre())
                 .build();
     }

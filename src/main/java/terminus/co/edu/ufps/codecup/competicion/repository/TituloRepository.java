@@ -16,6 +16,6 @@ public interface TituloRepository extends JpaRepository<Titulo, UUID> {
      */
     @Query("SELECT t FROM Titulo t " +
            "JOIN JugadorEquipo je ON je.equipoTorneo.id = t.equipoTorneo.id " +
-           "WHERE je.cedula = :cedula")
-    List<Titulo> findByJugadorCedula(String cedula);
+           "WHERE je.personaId = :personaId")
+    List<Titulo> findByPersonaId(UUID personaId);
 }

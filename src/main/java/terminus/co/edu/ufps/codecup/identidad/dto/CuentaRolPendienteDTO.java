@@ -15,7 +15,7 @@ public class CuentaRolPendienteDTO {
 
     private UUID cuentaId;
 
-    private String cedula;
+    private String numeroDocumento;
 
     private Rol rol;
 

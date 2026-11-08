@@ -16,7 +16,8 @@ public class InscripcionDTO {
     private String torneoNombre;
     private UUID equipoId;
     private String equipoNombre;
-    private String delegadoCedula;
+    private UUID delegadoPersonaId;
+    private String delegadoNombre;
     private String estadoInscripcion;
     private String aprobadoPor;
     private String motivoRechazo;

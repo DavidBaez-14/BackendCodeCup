@@ -26,8 +26,6 @@ public class MeResponseDTO {
 
     private String numeroDocumento;
 
-    /** = numeroDocumento. Transición hasta M2: la web y la competición aún usan "cedula". */
-    private String cedula;
 
     private String estado;
 

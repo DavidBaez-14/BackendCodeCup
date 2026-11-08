@@ -9,8 +9,8 @@ import java.util.UUID;
 /**
  * Solicitud de un jugador para ingresar al plantel de un equipo en un torneo.
  *
- * Nombre y correo se copian de la persona registrada al crear (la tabla los
- * exige NOT NULL). Quien pide el ingreso siempre tiene cuenta.
+ * Quien pide el ingreso siempre tiene cuenta. Su nombre y su correo se leen de
+ * identidad (spec 0022): la solicitud solo guarda la persona.
  */
 @Data
 @Builder
@@ -32,14 +32,8 @@ public class SolicitudEquipo {
     @JoinColumn(name = "equipo_torneo_id", nullable = false)
     private EquipoTorneo equipoTorneo;
 
-    @Column(nullable = false, length = 20)
-    private String cedula;
-
-    @Column(nullable = false, length = 150)
-    private String nombre;
-
-    @Column(length = 150)
-    private String correo;
+    @Column(name = "persona_id", nullable = false)
+    private UUID personaId;
 
     @Builder.Default
     @Enumerated(EnumType.STRING)

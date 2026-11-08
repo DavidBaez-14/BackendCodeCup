@@ -88,7 +88,7 @@ public class SnapshotBuilderService {
         for (var row : data) {
             goleadorRepo.save(SnapshotGoleador.builder()
                     .torneoId(torneoId)
-                    .cedula(row.cedula())
+                    .personaId(row.personaId())
                     .jugadorNombre(row.jugadorNombre())
                     .equipoNombre(row.equipoNombre())
                     .goles(row.goles())

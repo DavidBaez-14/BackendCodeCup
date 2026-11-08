@@ -42,7 +42,7 @@ public class AdminCuentasService {
                 .toList();
         return CuentaAdminDTO.builder()
                 .id(cuenta.getId())
-                .cedula(persona != null ? persona.getNumeroDocumento() : null)
+                .numeroDocumento(persona != null ? persona.getNumeroDocumento() : null)
                 .nombre(persona != null ? persona.nombreCompleto() : null)
                 .correo(cuenta.getCorreo())
                 .estado(cuenta.getEstado().name())

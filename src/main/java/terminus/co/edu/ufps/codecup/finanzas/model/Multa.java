@@ -27,8 +27,9 @@ public class Multa {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(nullable = false, length = 20)
-    private String cedula;
+    /** Persona sancionada (spec 0022). */
+    @Column(name = "persona_id", nullable = false)
+    private UUID personaId;
 
     @Column(name = "partido_id", nullable = false)
     private UUID partidoId;
@@ -70,8 +71,9 @@ public class Multa {
     @Column(name = "partidos_suspension_restantes")
     private Integer partidosSuspensionRestantes;
 
-    @Column(name = "pagado_por_cedula", length = 20)
-    private String pagadoPorCedula;
+    /** Cuenta de quien registró el pago, o de quien subió el comprobante aprobado. */
+    @Column(name = "pagado_por_cuenta_id")
+    private UUID pagadoPorCuentaId;
 
     @Column(name = "partido_pago_id")
     private UUID partidoPagoId;
@@ -80,8 +82,8 @@ public class Multa {
     @Column(name = "habilitado_manual", nullable = false)
     private Boolean habilitadoManual = false;
 
-    @Column(name = "habilitado_por_cedula", length = 20)
-    private String habilitadoPorCedula;
+    @Column(name = "habilitado_por_cuenta_id")
+    private UUID habilitadoPorCuentaId;
 
     @Column(name = "habilitado_en")
     private LocalDateTime habilitadoEn;
