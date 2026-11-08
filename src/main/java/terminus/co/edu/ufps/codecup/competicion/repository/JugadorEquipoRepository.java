@@ -12,6 +12,8 @@ import java.util.UUID;
 public interface JugadorEquipoRepository extends JpaRepository<JugadorEquipo, UUID> {
     Optional<JugadorEquipo> findByPersonaIdAndTorneoId(UUID personaId, UUID torneoId);
     boolean existsByPersonaIdAndTorneoId(UUID personaId, UUID torneoId);
+    boolean existsByPersonaId(UUID personaId);
+    List<JugadorEquipo> findByEquipoTorneoIdIn(java.util.Collection<UUID> equipoTorneoIds);
     List<JugadorEquipo> findByPersonaIdOrderByFechaInicioDesc(UUID personaId);
     List<JugadorEquipo> findByEquipoTorneoIdOrderByFechaInicioAsc(UUID equipoTorneoId);
 

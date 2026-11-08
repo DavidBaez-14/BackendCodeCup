@@ -10,9 +10,11 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import terminus.co.edu.ufps.codecup.identidad.dto.DocumentoRequestDTO;
 import terminus.co.edu.ufps.codecup.identidad.dto.MeResponseDTO;
 import terminus.co.edu.ufps.codecup.identidad.dto.RegistroRequestDTO;
 import terminus.co.edu.ufps.codecup.identidad.dto.SolicitarRolRequestDTO;
@@ -43,6 +45,17 @@ public class AuthController {
                                                   @Valid @RequestBody RegistroRequestDTO req) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(authService.registrar(jwt.getSubject(), jwt.getClaimAsString("email"), req));
+    }
+
+    /**
+     * Spec 0023: agregar el documento después del registro. 200 si quedó guardado; 202 si era de una
+     * persona sin cuenta y se abrió una solicitud de vínculo (la aprueba su delegado o un admin).
+     */
+    @PutMapping("/me/documento")
+    public ResponseEntity<MeResponseDTO> asignarDocumento(@AuthenticationPrincipal Jwt jwt,
+                                                          @Valid @RequestBody DocumentoRequestDTO req) {
+        var resultado = authService.asignarDocumento(jwt.getSubject(), req);
+        return ResponseEntity.status(resultado.vinculoAbierto() ? HttpStatus.ACCEPTED : HttpStatus.OK).body(resultado.me());
     }
 
     @PostMapping("/solicitar-rol")

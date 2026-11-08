@@ -55,6 +55,11 @@ public class Torneo {
     @Column(name = "clasifican_por_grupo")
     private Integer clasificanPorGrupo;
 
+    /** Spec 0023: si el admin lo activa, todo miembro del torneo debe tener documento. Por defecto no. */
+    @Builder.Default
+    @Column(name = "exige_documento", nullable = false)
+    private Boolean exigeDocumento = false;
+
     @Builder.Default
     @Column(name = "repechaje", nullable = false)
     private Boolean repechaje = false;

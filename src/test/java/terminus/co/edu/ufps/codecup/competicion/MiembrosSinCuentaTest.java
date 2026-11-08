@@ -193,8 +193,7 @@ class MiembrosSinCuentaTest extends AuthTestSupport {
     void cuerpoInvalido_400Validacion() throws Exception {
         var m = mundo();
 
-        agregar(m, cuerpo(null, "Ana"))
-                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDACION"));
+        // Sin documento ya es válido (spec 0023); escrito pero sin letras ni números, no.
         agregar(m, cuerpo(" . . ", "Ana"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDACION"));
         agregar(m, cuerpo("1".repeat(21), "Ana"))
@@ -311,7 +310,7 @@ class MiembrosSinCuentaTest extends AuthTestSupport {
     // ── Criterios 9 a 11 de la 0018 y 5 de la 0022 ──────────────────────
 
     @Test
-    void registrarseDespues_asociaLaMismaPersona_veSuGol_yTodosMuestranSuNombre() throws Exception {
+    void registrarseDespues_conVinculoAprobado_veSuGol_yTodosMuestranSuNombre() throws Exception {
         var m = mundo();
         String doc = documentoAlAzar();
         agregar(m, cuerpo(doc, "Ana Pérez")).andExpect(status().isOk());
@@ -335,11 +334,19 @@ class MiembrosSinCuentaTest extends AuthTestSupport {
                 .tipoEvento(TipoEvento.GOL).orden(1)
                 .build());
 
-        // Se registra después, con el documento escrito con puntos: queda asociado a esa persona.
+        // Se registra después, con el documento escrito con puntos. Spec 0023: no queda asociado solo;
+        // recibe una persona propia y abre una solicitud de vínculo que aprueba su delegado.
         var u = usuario();
-        registrar(u, "CC", conPuntos(doc))
+        String registro = registrar(u, "CC", conPuntos(doc))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.personaId").value(personaId.toString()));
+                .andExpect(jsonPath("$.vinculoPendiente.personaId").value(personaId.toString()))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(objectMapper.readTree(registro).get("personaId").asText()).isNotEqualTo(personaId.toString());
+        String vinculoId = objectMapper.readTree(registro).get("vinculoPendiente").get("id").asText();
+        mvc.perform(post("/api/supercopa/vinculos/{id}/aprobar", vinculoId)
+                        .header("Authorization", m.delegado().bearer()))
+                .andExpect(status().isNoContent());
+
         var cuenta = cuentaRepository.findConPersona(Cuenta.PROVEEDOR_SUPABASE, u.sub()).orElseThrow();
         assertThat(cuenta.getPersona().getId()).isEqualTo(personaId);
         assertThat(cuenta.getPersona().nombreCompleto()).isEqualTo(NOMBRE_REGISTRADO);

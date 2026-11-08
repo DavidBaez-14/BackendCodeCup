@@ -10,6 +10,7 @@ import java.util.UUID;
 
 public interface PartidoJugadorRepository extends JpaRepository<PartidoJugador, UUID> {
     List<PartidoJugador> findByPersonaIdAndJugoTrue(UUID personaId);
+    boolean existsByPersonaId(UUID personaId);
     Optional<PartidoJugador> findByPartidoIdAndPersonaId(UUID partidoId, UUID personaId);
     List<PartidoJugador> findByPartidoId(UUID partidoId);
 }

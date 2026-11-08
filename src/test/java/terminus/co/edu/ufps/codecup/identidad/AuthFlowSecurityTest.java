@@ -103,11 +103,12 @@ class AuthFlowSecurityTest extends AuthTestSupport {
     }
 
     @Test
-    void registro_sinDocumento_400Validacion() throws Exception {
+    void registro_sinNombres_400Validacion() throws Exception {
+        // Spec 0023: el documento ya es opcional; lo obligatorio son los nombres.
         var u = usuario();
         mvc.perform(post("/api/auth/registro").header("Authorization", u.bearer())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("nombres", "Ana", "apellidos", "Pérez"))))
+                        .content(json(Map.of("tipoDocumento", "CC", "numeroDocumento", documentoAlAzar()))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDACION"));
     }

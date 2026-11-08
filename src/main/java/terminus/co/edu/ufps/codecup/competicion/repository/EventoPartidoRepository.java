@@ -11,6 +11,7 @@ import java.util.UUID;
 public interface EventoPartidoRepository extends JpaRepository<EventoPartido, UUID> {
     List<EventoPartido> findByPartidoIdOrderByOrdenAsc(UUID partidoId);
     List<EventoPartido> findByPersonaId(UUID personaId);
+    boolean existsByPersonaId(UUID personaId);
     long countByPartidoIdAndEquipoTorneoIdAndTipoEvento(UUID partidoId, UUID equipoTorneoId, TipoEvento tipoEvento);
 
     @org.springframework.data.jpa.repository.Query("SELECT COALESCE(MAX(e.orden), 0) FROM EventoPartido e WHERE e.partido.id = :partidoId")

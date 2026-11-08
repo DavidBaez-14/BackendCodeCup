@@ -1,7 +1,7 @@
 package terminus.co.edu.ufps.codecup.identidad.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
@@ -18,11 +18,9 @@ public class RegistroRequestDTO {
     @Size(max = 100)
     private String apellidos;
 
-    /** Obligatorio solo hasta M2, mientras la competición use la cédula como llave. */
-    @NotNull
+    /** Opcional (spec 0023): si llega, va con el número. */
     private TipoDocumento tipoDocumento;
 
-    @NotBlank
     @Size(max = 20)
     @Pattern(regexp = "^[A-Za-z0-9. ]+$", message = "solo letras, números, puntos y espacios")
     private String numeroDocumento;

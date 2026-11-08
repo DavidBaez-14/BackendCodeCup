@@ -127,6 +127,11 @@ public class DelegadoService {
         if (torneo.getEstado() != EstadoTorneo.PUBLICADO) {
             throw new RuntimeException("Solo se puede inscribir a torneos PUBLICADOS.");
         }
+        // Spec 0023: si el torneo exige documento, el delegado (que entra al plantel) debe tenerlo.
+        if (Boolean.TRUE.equals(torneo.getExigeDocumento())
+                && directorioPersonas.requerir(delegadoPersonaId).numeroDocumento() == null) {
+            throw documentoRequerido("Este torneo exige documento: agrega el tuyo en tu perfil antes de inscribir el equipo.");
+        }
 
         var equipoDto = miEquipo(delegadoPersonaId);
         var equipo = equipoRepo.findById(equipoDto.getId())
@@ -192,9 +197,14 @@ public class DelegadoService {
         var et = inscripcionDelDelegado(delegadoPersonaId, equipoTorneoId);
 
         // Spec 0018: el documento se normaliza igual que en el registro, para que
-        // "1.090 123" y "1090123" sean la misma persona y no dos.
+        // "1.090 123" y "1090123" sean la misma persona y no dos. Spec 0023: es opcional,
+        // salvo que el torneo lo exija; sin documento, la persona siempre es nueva.
         String documento = normalizarDocumento(req.getNumeroDocumento());
-        var persona = directorioPersonas.buscarPorDocumento(documento).orElse(null);
+        if (documento == null && Boolean.TRUE.equals(et.getTorneo().getExigeDocumento())) {
+            throw ApiException.badRequest("DOCUMENTO_REQUERIDO",
+                    "Este torneo exige documento: escribe el número de documento del jugador.");
+        }
+        var persona = documento == null ? null : directorioPersonas.buscarPorDocumento(documento).orElse(null);
         if (persona != null && persona.cuentaBloqueada()) {
             throw jugadorBloqueado();
         }
@@ -263,16 +273,24 @@ public class DelegadoService {
         return toMiembroDTO(je, persona, et);
     }
 
-    /** Mismo criterio que el registro (identidad); vacio o mas largo que la columna = 400 VALIDACION. */
+    /**
+     * Mismo criterio que el registro (identidad). Sin documento (null o vacío) = null: es opcional
+     * (spec 0023). Escrito pero sin letras ni números, o más largo que la columna = 400 VALIDACION.
+     */
     private static String normalizarDocumento(String documento) {
+        if (documento == null || documento.isBlank()) return null;
         String numero = Documentos.normalizar(documento);
         if (numero == null) {
-            throw ApiException.badRequest("VALIDACION", "El documento es obligatorio.");
+            throw ApiException.badRequest("VALIDACION", "El documento no es válido.");
         }
         if (numero.length() > 20) {
             throw ApiException.badRequest("VALIDACION", "El documento no puede tener más de 20 caracteres.");
         }
         return numero;
+    }
+
+    private static ApiException documentoRequerido(String mensaje) {
+        return ApiException.conflict("DOCUMENTO_REQUERIDO", mensaje);
     }
 
     /** Sin espacios al inicio ni al final; vacio = no enviado. */

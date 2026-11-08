@@ -49,8 +49,10 @@ public class SolicitudService {
         }
 
         // El perfil deportivo es opcional (spec 0020): no se exige para pedir ingreso.
-        directorioPersonas.buscar(personaId)
+        var persona = directorioPersonas.buscar(personaId)
                 .orElseThrow(() -> new ResourceNotFoundException("Completa tu registro en CodeCup para continuar."));
+        exigirDocumentoSiHaceFalta(torneo, persona,
+                "Este torneo exige documento: agrégalo en tu perfil antes de pedir unirte.");
 
         if (jugadorEquipoRepo.existsByPersonaIdAndTorneoId(personaId, torneo.getId())) {
             throw new RuntimeException("Ya perteneces a un equipo en este torneo.");
@@ -105,6 +107,8 @@ public class SolicitudService {
             throw ApiException.conflict("JUGADOR_BLOQUEADO",
                     "Esta persona tiene la cuenta bloqueada: no puede entrar a un plantel.");
         }
+        exigirDocumentoSiHaceFalta(solicitud.getTorneo(), persona,
+                "Este torneo exige documento y esta persona todavía no lo tiene registrado.");
         if (jugadorEquipoRepo.existsByPersonaIdAndTorneoId(
                 solicitud.getPersonaId(), solicitud.getTorneo().getId())) {
             throw new RuntimeException("El jugador ya pertenece a un equipo en este torneo.");
@@ -146,6 +150,13 @@ public class SolicitudService {
         solicitud.setFechaResolucion(LocalDateTime.now());
         solicitudRepo.save(solicitud);
         return toDTO(solicitud);
+    }
+
+    /** Spec 0023: si el torneo exige documento, quien entra al plantel debe tenerlo. */
+    private static void exigirDocumentoSiHaceFalta(Torneo torneo, PersonaResumen persona, String mensaje) {
+        if (Boolean.TRUE.equals(torneo.getExigeDocumento()) && persona.numeroDocumento() == null) {
+            throw ApiException.conflict("DOCUMENTO_REQUERIDO", mensaje);
+        }
     }
 
     private void validarDelegadoEsDueno(SolicitudEquipo solicitud, UUID delegadoPersonaId) {

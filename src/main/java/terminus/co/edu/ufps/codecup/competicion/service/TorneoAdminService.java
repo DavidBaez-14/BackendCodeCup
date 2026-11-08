@@ -69,6 +69,7 @@ public class TorneoAdminService {
                 .fechaInicio(req.getFechaInicio())
                 .fechaFin(req.getFechaFin())
                 .repechaje(false)
+                .exigeDocumento(Boolean.TRUE.equals(req.getExigeDocumento()))
                 .build();
         torneoRepo.save(torneo);
         return toDTO(torneo);
@@ -106,6 +107,16 @@ public class TorneoAdminService {
             throw new RuntimeException("Solo se puede iniciar un torneo en estado PUBLICADO.");
         }
         torneo.setEstado(EstadoTorneo.EN_CURSO);
+        torneoRepo.save(torneo);
+        return toDTO(torneo);
+    }
+
+    /** Spec 0023: el admin decide si su torneo exige documento. Se puede cambiar en cualquier estado. */
+    @Transactional
+    public TorneoDTO cambiarExigeDocumento(UUID torneoId, boolean exigeDocumento) {
+        var torneo = torneoRepo.findById(torneoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Torneo no encontrado."));
+        torneo.setExigeDocumento(exigeDocumento);
         torneoRepo.save(torneo);
         return toDTO(torneo);
     }
@@ -505,6 +516,7 @@ public class TorneoAdminService {
                 .torneoNombre(t.getNombre())
                 .estado(t.getEstado() != null ? t.getEstado().name() : null)
                 .formato(t.getFormato() != null ? t.getFormato().name() : null)
+                .exigeDocumento(Boolean.TRUE.equals(t.getExigeDocumento()))
                 .numGrupos(t.getNumGrupos())
                 .clasificanPorGrupo(t.getClasificanPorGrupo())
                 .repechaje(t.getRepechaje())
@@ -550,6 +562,7 @@ public class TorneoAdminService {
                 .fechaFin(t.getFechaFin())
                 .publicadoEn(t.getPublicadoEn())
                 .formato(t.getFormato() != null ? t.getFormato().name() : null)
+                .exigeDocumento(Boolean.TRUE.equals(t.getExigeDocumento()))
                 .build();
     }
 }

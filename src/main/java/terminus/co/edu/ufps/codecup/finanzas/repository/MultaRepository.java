@@ -23,6 +23,8 @@ public interface MultaRepository extends JpaRepository<Multa, UUID> {
 
     long countByPersonaIdAndEstado(UUID personaId, EstadoMulta estado);
 
+    boolean existsByPersonaId(UUID personaId);
+
     List<Multa> findByPersonaIdAndTorneoIdAndEstado(UUID personaId, UUID torneoId, EstadoMulta estado);
 
     boolean existsByPersonaIdAndTorneoIdAndEstado(UUID personaId, UUID torneoId, EstadoMulta estado);

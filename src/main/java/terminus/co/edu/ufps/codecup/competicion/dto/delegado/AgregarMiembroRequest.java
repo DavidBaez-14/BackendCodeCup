@@ -1,6 +1,6 @@
 package terminus.co.edu.ufps.codecup.competicion.dto.delegado;
 
-import jakarta.validation.constraints.NotBlank;
+
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -17,8 +17,10 @@ import terminus.co.edu.ufps.codecup.identidad.model.TipoDocumento;
 @AllArgsConstructor
 public class AgregarMiembroRequest {
 
-    /** Número de documento. Se normaliza igual que en el registro ("1.090 123" = "1090123"). */
-    @NotBlank(message = "El documento es obligatorio.")
+    /**
+     * Número de documento: opcional (spec 0023), salvo que el torneo lo exija. Se normaliza igual
+     * que en el registro ("1.090 123" = "1090123").
+     */
     private String numeroDocumento;
 
     /** Tipo de documento; si no llega, CC (spec 0022). Solo se usa si la persona es nueva. */

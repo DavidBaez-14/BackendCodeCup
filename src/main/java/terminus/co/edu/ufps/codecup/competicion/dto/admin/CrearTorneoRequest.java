@@ -12,4 +12,6 @@ public class CrearTorneoRequest {
     private Integer edicion;
     private LocalDate fechaInicio;
     private LocalDate fechaFin;
+    /** Opcional (spec 0023): por defecto el torneo no exige documento. */
+    private Boolean exigeDocumento;
 }

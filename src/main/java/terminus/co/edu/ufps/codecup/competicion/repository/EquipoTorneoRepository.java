@@ -14,6 +14,7 @@ public interface EquipoTorneoRepository extends JpaRepository<EquipoTorneo, UUID
     List<EquipoTorneo> findByTorneoIdAndEstadoInscripcionOrderByFechaInscripcionAsc(UUID torneoId, EstadoInscripcion estado);
     List<EquipoTorneo> findByDelegadoPersonaIdOrderByFechaInscripcionDesc(UUID delegadoPersonaId);
     Optional<EquipoTorneo> findByTorneoIdAndDelegadoPersonaId(UUID torneoId, UUID delegadoPersonaId);
+    boolean existsByDelegadoPersonaId(UUID delegadoPersonaId);
     Optional<EquipoTorneo> findByTorneoIdAndEquipoId(UUID torneoId, UUID equipoId);
     boolean existsByEquipoId(UUID equipoId);
 }

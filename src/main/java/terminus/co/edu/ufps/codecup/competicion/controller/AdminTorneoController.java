@@ -86,6 +86,15 @@ public class AdminTorneoController {
         return ResponseEntity.ok(finanzasConfigService.guardarInscripcionConfig(torneoId, req));
     }
 
+    /** Spec 0023: el torneo exige (o no) documento a sus miembros. */
+    @PutMapping("/{torneoId}/exige-documento")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public ResponseEntity<TorneoDTO> cambiarExigeDocumento(@PathVariable UUID torneoId,
+                                                           @RequestBody java.util.Map<String, Boolean> req) {
+        return ResponseEntity.ok(torneoAdminService.cambiarExigeDocumento(torneoId,
+                Boolean.TRUE.equals(req.get("exigeDocumento"))));
+    }
+
     @PutMapping("/{torneoId}/multa-config")
     @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ResponseEntity<MultaConfigDTO> guardarMultaConfig(

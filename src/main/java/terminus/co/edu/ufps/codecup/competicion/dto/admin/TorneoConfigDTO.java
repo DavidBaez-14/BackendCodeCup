@@ -14,6 +14,8 @@ public class TorneoConfigDTO {
     private String torneoNombre;
     private String estado;
     private String formato;
+    /** Spec 0023: el torneo exige documento a sus miembros. */
+    private Boolean exigeDocumento;
     private Integer numGrupos;
     private Integer clasificanPorGrupo;
     private Boolean repechaje;

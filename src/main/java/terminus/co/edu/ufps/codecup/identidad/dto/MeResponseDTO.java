@@ -33,4 +33,10 @@ public class MeResponseDTO {
     private List<String> roles;
 
     private List<String> rolesPendientes;
+
+    /** Solicitud de vínculo con una persona con historial, si la cuenta tiene una pendiente (spec 0023). */
+    private VinculoPendiente vinculoPendiente;
+
+    public record VinculoPendiente(UUID id, UUID personaId, String estado, java.time.LocalDateTime creadoEn) {
+    }
 }

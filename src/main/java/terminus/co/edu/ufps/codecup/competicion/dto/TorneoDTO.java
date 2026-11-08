@@ -19,4 +19,6 @@ public class TorneoDTO {
     private LocalDate fechaFin;
     private LocalDateTime publicadoEn;
     private String formato;
+    /** Spec 0023: el torneo exige documento a sus miembros. */
+    private Boolean exigeDocumento;
 }

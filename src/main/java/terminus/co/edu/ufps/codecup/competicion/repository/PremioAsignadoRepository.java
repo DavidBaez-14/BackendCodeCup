@@ -11,4 +11,5 @@ public interface PremioAsignadoRepository extends JpaRepository<PremioAsignado, 
     Optional<PremioAsignado> findByTorneoIdAndPremioId(UUID torneoId, UUID premioId);
     List<PremioAsignado> findByTorneoId(UUID torneoId);
     boolean existsByPremioId(UUID torneoPremioId);
+    boolean existsByPersonaId(UUID personaId);
 }
