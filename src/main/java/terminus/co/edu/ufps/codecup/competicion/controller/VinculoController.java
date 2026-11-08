@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import terminus.co.edu.ufps.codecup.competicion.dto.MiembroReclamableDTO;
 import terminus.co.edu.ufps.codecup.competicion.dto.VinculoPendienteDTO;
 import terminus.co.edu.ufps.codecup.competicion.service.VinculacionService;
 import terminus.co.edu.ufps.codecup.shared.security.JwtClaims;
@@ -49,6 +50,27 @@ public class VinculoController {
         String motivo = req != null ? req.get("motivo") : null;
         vinculacionService.rechazar(id, motivo, JwtClaims.personaId(jwt), JwtClaims.cuentaId(jwt), esAdmin(auth));
         return ResponseEntity.noContent().build();
+    }
+
+    // ─── D3: el jugador se reconoce en un plantel donde lo anotaron sin documento ─────
+
+    /** Miembros sin cuenta de un equipo, sin documento ni correo, para buscar "ese soy yo". */
+    @GetMapping("/equipo-torneo/{equipoTorneoId}/miembros-sin-cuenta")
+    @PreAuthorize("hasRole('JUGADOR')")
+    public ResponseEntity<List<MiembroReclamableDTO>> miembrosSinCuenta(@PathVariable UUID equipoTorneoId) {
+        return ResponseEntity.ok(vinculacionService.miembrosSinCuenta(equipoTorneoId));
+    }
+
+    /** Abre la solicitud de vínculo; la aprueba el delegado de un equipo donde estuvo esa persona o un admin. */
+    @PostMapping("/reclamar")
+    @PreAuthorize("hasRole('JUGADOR')")
+    public ResponseEntity<VinculoPendienteDTO> reclamar(@RequestBody Map<String, UUID> req, @AuthenticationPrincipal Jwt jwt) {
+        UUID personaId = req.get("personaId");
+        if (personaId == null) {
+            throw terminus.co.edu.ufps.codecup.shared.error.ApiException.badRequest("VALIDACION", "Indica la persona (personaId).");
+        }
+        return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED)
+                .body(vinculacionService.reclamar(JwtClaims.cuentaId(jwt), JwtClaims.personaId(jwt), personaId));
     }
 
     private static boolean esAdmin(Authentication auth) {

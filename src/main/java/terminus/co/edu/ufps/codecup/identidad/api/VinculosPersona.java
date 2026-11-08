@@ -114,7 +114,18 @@ public class VinculosPersona {
         cuenta.setPersona(destino);
         cuentaRepository.saveAndFlush(cuenta);
         if (anterior != null && !anterior.getId().equals(destino.getId())) {
+            // D3: si quien reclama ya tenía documento y la persona del plantel no (la anotaron solo
+            // con el nombre), el documento pasa a la persona reclamada. Primero se borra la anterior:
+            // el número no se puede repetir.
+            var tipo = anterior.getTipoDocumento();
+            var numero = anterior.getNumeroDocumento();
             personaRepository.delete(anterior);
+            personaRepository.flush();
+            if (destino.getNumeroDocumento() == null && numero != null) {
+                destino.setTipoDocumento(tipo);
+                destino.setNumeroDocumento(numero);
+                personaRepository.save(destino);
+            }
         }
 
         vinculo.setEstado(EstadoVinculo.APROBADA);

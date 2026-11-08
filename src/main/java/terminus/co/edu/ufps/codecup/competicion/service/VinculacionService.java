@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import terminus.co.edu.ufps.codecup.competicion.dto.MiembroReclamableDTO;
 import terminus.co.edu.ufps.codecup.competicion.dto.VinculoPendienteDTO;
 import terminus.co.edu.ufps.codecup.competicion.model.EquipoTorneo;
 import terminus.co.edu.ufps.codecup.competicion.model.JugadorEquipo;
@@ -22,7 +23,9 @@ import terminus.co.edu.ufps.codecup.competicion.repository.SolicitudEquipoReposi
 import terminus.co.edu.ufps.codecup.finanzas.repository.MultaRepository;
 import terminus.co.edu.ufps.codecup.identidad.api.DirectorioPersonas;
 import terminus.co.edu.ufps.codecup.identidad.api.VinculosPersona;
+import terminus.co.edu.ufps.codecup.identidad.model.TipoDocumento;
 import terminus.co.edu.ufps.codecup.shared.error.ApiException;
+import terminus.co.edu.ufps.codecup.shared.error.ResourceNotFoundException;
 
 /**
  * Vinculación verificada desde la competición (spec 0023, D1). Identidad guarda la solicitud y hace
@@ -76,6 +79,57 @@ public class VinculacionService {
         var vinculo = vinculosPersona.requerirPendiente(vinculoId);
         exigirPermiso(vinculo.personaId(), personaQueRechaza, esAdmin);
         vinculosPersona.rechazar(vinculoId, cuentaQueRechaza, motivo);
+    }
+
+    // ─── D3: reclamar un historial anotado sin documento ────────────────────
+
+    /**
+     * Los miembros sin cuenta de un plantel, para que alguien se reconozca ("ese soy yo"). Sin
+     * documento ni correo; un menor (TI) sale con su nombre visible.
+     */
+    @Transactional(readOnly = true)
+    public List<MiembroReclamableDTO> miembrosSinCuenta(UUID equipoTorneoId) {
+        equipoTorneoRepo.findById(equipoTorneoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Inscripcion no encontrada."));
+        var plantel = jugadorEquipoRepo.findByEquipoTorneoIdOrderByFechaInicioAsc(equipoTorneoId);
+        var personas = directorioPersonas.buscarVarias(plantel.stream().map(JugadorEquipo::getPersonaId).toList());
+        return plantel.stream()
+                .filter(je -> personas.containsKey(je.getPersonaId()) && !personas.get(je.getPersonaId()).tieneCuenta())
+                .map(je -> {
+                    var p = personas.get(je.getPersonaId());
+                    String nombre = p.tipoDocumento() == TipoDocumento.TI || je.getNombreSnapshot() == null
+                            || je.getNombreSnapshot().isBlank()
+                            ? p.nombreVisible()
+                            : je.getNombreSnapshot();
+                    return MiembroReclamableDTO.builder()
+                            .personaId(je.getPersonaId())
+                            .nombre(nombre)
+                            .numeroCamiseta(je.getNumeroCamiseta())
+                            .build();
+                })
+                .toList();
+    }
+
+    /**
+     * D3 (8-nov-2026): una cuenta dice "esa persona del plantel soy yo". Abre la misma solicitud de
+     * vínculo que el registro con documento; la aprueba el delegado de un equipo donde estuvo esa
+     * persona o un admin.
+     */
+    @Transactional
+    public VinculoPendienteDTO reclamar(UUID cuentaQueReclama, UUID personaQueReclama, UUID personaReclamada) {
+        var objetivo = directorioPersonas.requerir(personaReclamada);
+        if (objetivo.tieneCuenta()) {
+            throw ApiException.conflict("PERSONA_YA_VINCULADA", "Esa persona ya tiene una cuenta.");
+        }
+        if (!jugadorEquipoRepo.existsByPersonaId(personaReclamada)) {
+            throw ApiException.conflict("SIN_HISTORIAL", "Esa persona no está en ningún plantel: no hay historial que reclamar.");
+        }
+        var actual = directorioPersonas.requerir(personaQueReclama);
+        if (objetivo.numeroDocumento() != null && actual.numeroDocumento() != null) {
+            throw ApiException.conflict("DOCUMENTOS_DISTINTOS",
+                    "Esa persona tiene otro documento registrado: no puede ser la misma que tu cuenta.");
+        }
+        return toDTO(vinculosPersona.solicitar(cuentaQueReclama, personaReclamada));
     }
 
     /** Plantel, solicitudes, equipo o inscripción como delegado, partidos, eventos, premios o multas. */
