@@ -1,9 +1,11 @@
 package terminus.co.edu.ufps.codecup;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
 import java.io.IOException;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -69,7 +71,7 @@ class FlywayBaselineTest {
         var versiones = jdbc.queryForList(
                 "select version from identidad.flyway_schema_history where success and version is not null order by installed_rank",
                 String.class);
-        assertThat(versiones).containsExactly("1", "2", "3");
+        assertThat(versiones).containsExactly("1", "2", "3", "4");
 
         var schemas = jdbc.queryForList(
                 "select schema_name from information_schema.schemata where schema_name in ('identidad','competicion','finanzas','analytics')",
@@ -94,5 +96,33 @@ class FlywayBaselineTest {
         var error = org.assertj.core.api.Assertions.catchThrowable(() -> jdbc.update(
                 "insert into identidad.personas (nombres, numero_documento, created_at) values ('X', '123', now())"));
         assertThat(error).hasMessageContaining("personas_documento_completo_check");
+    }
+
+    /** Bug C5: V4 deja un premio por tipo en cada torneo. OTRO se repite, pero no con el mismo título. */
+    @Test
+    void premiosDuplicadosLosRechazaLaBd() {
+        UUID torneo = torneoNuevo();
+        insertarPremio(torneo, "CAMPEON", null);
+        insertarPremio(torneo, "OTRO", "Juego limpio");
+        insertarPremio(torneo, "OTRO", "Mejor barra");
+        insertarPremio(torneoNuevo(), "CAMPEON", null);
+
+        assertThat(catchThrowable(() -> insertarPremio(torneo, "CAMPEON", null)))
+                .hasMessageContaining("torneo_premio_tipo_uk");
+        assertThat(catchThrowable(() -> insertarPremio(torneo, "OTRO", "  JUEGO LIMPIO ")))
+                .hasMessageContaining("torneo_premio_otro_titulo_uk");
+    }
+
+    private UUID torneoNuevo() {
+        return jdbc.queryForObject(
+                "insert into competicion.torneos (nombre, edicion, estado, repechaje, created_at) "
+                        + "values ('Copa C5', 2026, 'BORRADOR', false, now()) returning id",
+                UUID.class);
+    }
+
+    private void insertarPremio(UUID torneoId, String codigo, String titulo) {
+        jdbc.update("insert into competicion.torneo_premio (torneo_id, premio_id, titulo, created_at) "
+                        + "values (?, (select id from competicion.premio_catalogo where codigo = ?), ?, now())",
+                torneoId, codigo, titulo);
     }
 }
