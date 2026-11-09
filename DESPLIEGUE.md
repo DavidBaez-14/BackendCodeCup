@@ -58,10 +58,23 @@ Se hace una sola vez. Flyway y el seed hacen casi todo.
 **Lo hace David en Supabase:**
 1. **Comprobar la región.** En Connect → Session pooler, el host debe contener `us-east-1`. Si sale otra región, en Render se elige la más cercana a esa en vez de Virginia.
 2. **Correo sin confirmación.** En Authentication → Sign In / Providers → Email, apagar **Confirm email**. En desarrollo no hace falta mandar correos.
-3. **URLs permitidas.** En Authentication → URL Configuration, poner `http://localhost:5173` como Site URL y agregar `http://localhost:5173/**` a Redirect URLs.
-4. **Bucket de comprobantes.** En Storage → New bucket, crear `comprobantes-inscripcion` como **privado**. El backend no lo crea solo.
-5. **Clave secreta para Render.** En Project Settings → API Keys → Secret keys, crear una nueva llamada `render`. Así se puede revocar sin tocar nada más.
-6. **Pasar los datos.** Te pasa la contraseña de la base, el host del Session pooler (Connect → Session pooler), la publishable key y la clave `render`.
+3. **A dónde vuelve la gente desde un correo o desde Google.** En Authentication → URL Configuration:
+   - **Site URL:** `http://localhost:5173`. Es a donde Supabase manda a alguien que hace clic en un enlace de un correo, como "restablecer contraseña". Viene con `http://localhost:3000`, que no es el puerto de la web.
+   - **Redirect URLs → Add URL:** `http://localhost:5173/**`. Es la lista de direcciones a las que la web puede pedir volver; el login con Google vuelve a `/auth/callback`.
+   - Cuando la web de desarrollo tenga una URL pública, se agrega aquí también.
+4. **Bucket de comprobantes.** El backend no lo crea solo. En Storage → New bucket:
+   - Nombre exacto `comprobantes-inscripcion`, con **Public bucket apagado**.
+   - Límite de tamaño y tipos permitidos: los mismos que tenga el bucket de #1. La web promete PDF, JPG o PNG de máximo 5 MB.
+   - No hacen falta políticas: el backend firma cada subida y descarga con la clave secreta.
+5. **Clave secreta para Render.** En Project Settings → API Keys → Secret keys → New secret key, con nombre `render`. Así se puede revocar sin tocar nada más.
+6. **Pasar los datos a quien despliega:**
+   - **`DB_URL`:** botón Connect (arriba) → Type **JDBC** → **Session pooler**. Se copia hasta `/postgres`, sin `?user=…&password=…`.
+   - **`DB_PASSWORD`:** la que se puso al crear el proyecto. Si se perdió, en Project Settings → Database → Reset database password.
+   - **`SUPABASE_PUBLISHABLE_KEY`** y la clave `render`: en Project Settings → API Keys.
+
+**Limitaciones de `DesafioSportsDev`:**
+- **"Entrar con Google" no funciona** mientras no se configure el proveedor de Google en este proyecto. Se entra con correo y contraseña.
+- **Los correos de recuperación casi no salen.** El servidor de correo por defecto de Supabase solo entrega a miembros de la organización y con un límite bajo por hora. Para probar, mejor las cuentas del seed.
 
 **Lo haces tú:**
 1. **Crear el servicio en Render** con esos valores (secciones 4 y 5). En el primer arranque, Flyway crea los schemas `identidad`, `competicion`, `finanzas` y `analytics`, y aplica todas las migraciones.
