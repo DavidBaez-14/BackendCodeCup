@@ -81,3 +81,7 @@ Crea en Supabase #1 los usuarios y datos para probar la web de punta a punta (sp
 ## Cambios de esquema
 
 **Nunca a mano.** Cada cambio es una migración nueva `src/main/resources/db/migration/V<n>__<descripcion>.sql`. `FlywayBaselineTest` comprueba que entidades y migraciones coinciden.
+
+## Despliegue
+
+El backend se despliega en Render con el `Dockerfile` de este repo. El paso a paso, las variables, las reglas de migraciones y los problemas comunes están en [DESPLIEGUE.md](DESPLIEGUE.md).

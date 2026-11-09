@@ -1,0 +1,22 @@
+# Lo que nunca entra a la imagen. El Dockerfile solo copia pom.xml y src/, pero esto
+# también evita subir secretos o basura al contexto del build.
+
+# Secretos locales
+.env
+.env.*
+
+# Compilados e IDE
+target/
+.idea/
+.vscode/
+*.iml
+.classpath
+.project
+.settings/
+.factorypath
+
+# Git, worktrees de Claude y varios
+.git/
+.claude/
+*.log
+HELP.md
