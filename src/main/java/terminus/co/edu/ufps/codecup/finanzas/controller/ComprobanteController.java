@@ -39,16 +39,16 @@ public class ComprobanteController {
                 .build());
     }
 
-    /** Spec 0001: el admin descarga cualquiera; el delegado, solo los de su equipo (403 si no). */
+    /**
+     * Spec 0001: el delegado, solo los de su equipo. Spec 0024: el admin, solo los de los torneos
+     * que administra. 403 COMPROBANTE_AJENO si no.
+     */
     @GetMapping("/{id}/download-url")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR','DELEGADO')")
+    @PreAuthorize("@authz.registrado()")
     public ResponseEntity<Map<String, String>> downloadUrl(
             @PathVariable UUID id,
-            @AuthenticationPrincipal Jwt jwt,
-            Authentication auth) {
-        boolean esAdmin = auth.getAuthorities().stream()
-                .anyMatch(a -> "ROLE_ADMINISTRADOR".equals(a.getAuthority()));
-        String fileKey = comprobanteService.archivoParaDescarga(id, JwtClaims.personaId(jwt), esAdmin);
+            @AuthenticationPrincipal Jwt jwt) {
+        String fileKey = comprobanteService.archivoParaDescarga(id, JwtClaims.personaId(jwt), JwtClaims.cuentaId(jwt));
         return ResponseEntity.ok(Map.of("url", storageService.generarDownloadUrl(fileKey)));
     }
 
@@ -66,14 +66,17 @@ public class ComprobanteController {
         return ResponseEntity.ok(comprobanteService.misComprobantes(JwtClaims.cuentaId(jwt)));
     }
 
+    /** Spec 0024: solo de los torneos que administra quien llama; {@code torneoId} filtra uno. */
     @GetMapping("/pendientes")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
-    public ResponseEntity<List<ComprobanteDTO>> listarPendientes() {
-        return ResponseEntity.ok(comprobanteService.listarPendientes());
+    @PreAuthorize("@authz.registrado()")
+    public ResponseEntity<List<ComprobanteDTO>> listarPendientes(
+            @org.springframework.web.bind.annotation.RequestParam(required = false) UUID torneoId,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(comprobanteService.listarPendientes(JwtClaims.cuentaId(jwt), torneoId));
     }
 
     @PostMapping("/{id}/aprobar")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("@authz.adminDeComprobante(#id)")
     public ResponseEntity<ComprobanteDTO> aprobar(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt) {
@@ -81,7 +84,7 @@ public class ComprobanteController {
     }
 
     @PostMapping("/{id}/rechazar")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("@authz.adminDeComprobante(#id)")
     public ResponseEntity<ComprobanteDTO> rechazar(
             @PathVariable UUID id,
             @Valid @RequestBody RechazoComprobanteRequest req,

@@ -40,13 +40,32 @@ public class Invitacion {
     @Column(nullable = false, unique = true, length = 64)
     private String token;
 
-    /** Siempre en minúsculas. */
-    @Column(nullable = false, length = 150)
+    /**
+     * Siempre en minúsculas. Null solo en una invitación con ámbito "por enlace" (spec 0024):
+     * la acepta cualquier cuenta que tenga el enlace, una sola vez.
+     */
+    @Column(length = 150)
     private String correo;
 
+    /**
+     * Con ámbito TORNEO, ADMINISTRADOR significa co-admin de ese torneo (y ARBITRO, árbitro de ese
+     * torneo). Sin ámbito, es el rol global.
+     */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Rol rol;
+
+    /** Null = invitación a la plataforma (rol global). */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private AmbitoInvitacion ambito;
+
+    @Column(name = "ambito_id")
+    private java.util.UUID ambitoId;
+
+    /** Lo que ve el invitado antes de aceptar, por ejemplo el nombre del torneo. */
+    @Column(name = "ambito_descripcion", length = 200)
+    private String ambitoDescripcion;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

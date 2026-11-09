@@ -27,19 +27,21 @@ import terminus.co.edu.ufps.codecup.shared.security.JwtClaims;
 @RestController
 @RequestMapping("/api/supercopa/vinculos")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('DELEGADO','ADMINISTRADOR')")
+// Spec 0024: quién resuelve cada solicitud lo decide el servicio (delegado del equipo, admin del
+// torneo o SUPERADMIN); ya no hace falta un rol global para entrar.
+@PreAuthorize("@authz.registrado()")
 public class VinculoController {
 
     private final VinculacionService vinculacionService;
 
     @GetMapping("/pendientes")
     public ResponseEntity<List<VinculoPendienteDTO>> pendientes(@AuthenticationPrincipal Jwt jwt, Authentication auth) {
-        return ResponseEntity.ok(vinculacionService.pendientes(JwtClaims.personaId(jwt), esAdmin(auth)));
+        return ResponseEntity.ok(vinculacionService.pendientes(JwtClaims.personaId(jwt), JwtClaims.cuentaId(jwt), esSuperadmin(auth)));
     }
 
     @PostMapping("/{id}/aprobar")
     public ResponseEntity<Void> aprobar(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt, Authentication auth) {
-        vinculacionService.aprobar(id, JwtClaims.personaId(jwt), JwtClaims.cuentaId(jwt), esAdmin(auth));
+        vinculacionService.aprobar(id, JwtClaims.personaId(jwt), JwtClaims.cuentaId(jwt), esSuperadmin(auth));
         return ResponseEntity.noContent().build();
     }
 
@@ -48,7 +50,7 @@ public class VinculoController {
                                          @RequestBody(required = false) Map<String, String> req,
                                          @AuthenticationPrincipal Jwt jwt, Authentication auth) {
         String motivo = req != null ? req.get("motivo") : null;
-        vinculacionService.rechazar(id, motivo, JwtClaims.personaId(jwt), JwtClaims.cuentaId(jwt), esAdmin(auth));
+        vinculacionService.rechazar(id, motivo, JwtClaims.personaId(jwt), JwtClaims.cuentaId(jwt), esSuperadmin(auth));
         return ResponseEntity.noContent().build();
     }
 
@@ -73,7 +75,7 @@ public class VinculoController {
                 .body(vinculacionService.reclamar(JwtClaims.cuentaId(jwt), JwtClaims.personaId(jwt), personaId));
     }
 
-    private static boolean esAdmin(Authentication auth) {
-        return auth.getAuthorities().stream().anyMatch(a -> "ROLE_ADMINISTRADOR".equals(a.getAuthority()));
+    private static boolean esSuperadmin(Authentication auth) {
+        return auth.getAuthorities().stream().anyMatch(a -> "ROLE_SUPERADMIN".equals(a.getAuthority()));
     }
 }

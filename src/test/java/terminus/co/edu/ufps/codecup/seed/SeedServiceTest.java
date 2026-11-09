@@ -45,6 +45,7 @@ class SeedServiceTest {
     @Autowired CuentaRolRepository roles;
     @Autowired PerfilDeportivoRepository perfiles;
     @Autowired TorneoRepository torneos;
+    @Autowired terminus.co.edu.ufps.codecup.competicion.repository.TorneoRolRepository torneoRoles;
     @Autowired EquipoRepository equipos;
     @Autowired EquipoTorneoRepository inscripciones;
     @Autowired JugadorEquipoRepository planteles;
@@ -59,7 +60,7 @@ class SeedServiceTest {
     };
 
     private SeedService seed(String contrasena) {
-        var repos = new SeedService.Repositorios(personas, cuentas, roles, perfiles, torneos, equipos,
+        var repos = new SeedService.Repositorios(personas, cuentas, roles, perfiles, torneos, torneoRoles, equipos,
                 inscripciones, planteles, partidos);
         return new SeedService(repos, supabaseSimulado, contrasena, new TransactionTemplate(transacciones));
     }
@@ -85,6 +86,12 @@ class SeedServiceTest {
 
         Torneo liga = torneo(DatosDePrueba.TORNEO_ARBITRO);
         assertThat(liga.getEstado()).isEqualTo(EstadoTorneo.EN_CURSO);
+
+        // Spec 0024: admin01 administra los dos torneos de prueba (sin admins globales) y es SUPERADMIN.
+        assertThat(conRol(deSeed, Rol.SUPERADMIN)).isEqualTo(1);
+        UUID admin01 = cuentas.findByPersonaId(persona("9000000001")).orElseThrow().getId();
+        assertThat(torneoRoles.torneosDe(admin01, terminus.co.edu.ufps.codecup.competicion.model.RolTorneo.ADMIN))
+                .containsExactlyInAnyOrder(copa.getId(), liga.getId());
         assertThat(partidos.findByTorneoId(liga.getId()))
                 .filteredOn(p -> p.getEstado() == EstadoPartido.PROGRAMADO)
                 .hasSize(1);

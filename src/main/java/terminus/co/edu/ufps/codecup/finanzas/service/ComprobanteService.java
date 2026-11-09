@@ -31,6 +31,7 @@ public class ComprobanteService {
     private final EquipoTorneoRepository equipoTorneoRepo;
     private final MultaRepository multaRepo;
     private final DirectorioPersonas directorioPersonas;
+    private final terminus.co.edu.ufps.codecup.competicion.service.PermisosTorneo permisos;
 
     @Transactional
     public ComprobanteDTO subir(SubirComprobanteRequest req, UUID personaUploader, UUID cuentaUploader) {
@@ -102,10 +103,29 @@ public class ComprobanteService {
         return toDTO(c);
     }
 
+    /**
+     * Spec 0024: los comprobantes por revisar de los torneos que la cuenta administra, o de uno
+     * solo con {@code torneoId} (403 NO_ADMIN_DEL_TORNEO si no lo administra). Sin torneos, vacía.
+     */
     @Transactional(readOnly = true)
-    public List<ComprobanteDTO> listarPendientes() {
-        return comprobanteRepo.findByEstado(EstadoComprobante.PENDIENTE_REVISION)
-                .stream().map(this::toDTO).toList();
+    public List<ComprobanteDTO> listarPendientes(UUID cuentaId, UUID torneoId) {
+        java.util.Set<UUID> torneos;
+        if (torneoId != null) {
+            permisos.exigirTorneo(torneoId);
+            if (!permisos.esAdmin(torneoId, cuentaId)) {
+                throw ApiException.forbidden("NO_ADMIN_DEL_TORNEO", "No administras este torneo.");
+            }
+            torneos = java.util.Set.of(torneoId);
+        } else {
+            torneos = new java.util.HashSet<>(permisos.torneosQueAdministra(cuentaId));
+        }
+        if (torneos.isEmpty()) return List.of();
+        return comprobanteRepo.findByEstado(EstadoComprobante.PENDIENTE_REVISION).stream()
+                .filter(c -> torneos.contains(permisos.torneoDeComprobante(c)))
+                .sorted(java.util.Comparator.comparing(Comprobante::getFechaSubida,
+                        java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())))
+                .map(this::toDTO)
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -196,16 +216,17 @@ public class ComprobanteService {
     }
 
     /**
-     * Spec 0001: el admin descarga cualquier comprobante; un delegado, solo los de su equipo.
-     * La propiedad se resuelve por el objeto referenciado (inscripcion o multa) y su delegado
-     * actual, no por quien lo subio.
+     * Spec 0001: un delegado descarga solo los de su equipo. Spec 0024: el admin, solo los de los
+     * torneos que administra. La propiedad se resuelve por el objeto referenciado (inscripcion o
+     * multa) y su delegado actual, no por quien lo subio.
      *
      * @return la clave del archivo en Storage
      */
     @Transactional(readOnly = true)
-    public String archivoParaDescarga(UUID comprobanteId, UUID persona, boolean esAdmin) {
+    public String archivoParaDescarga(UUID comprobanteId, UUID persona, UUID cuentaId) {
         var c = comprobanteRepo.findById(comprobanteId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comprobante no encontrado."));
+        boolean esAdmin = permisos.esAdmin(permisos.torneoDeComprobante(c), cuentaId);
         if (!esAdmin && !esDelegado(equipoDelComprobante(c), persona)) {
             throw ApiException.forbidden("COMPROBANTE_AJENO", "Este comprobante no es de tu equipo.");
         }
@@ -239,10 +260,17 @@ public class ComprobanteService {
     }
 
     private ComprobanteDTO toDTO(Comprobante c) {
+        var et = equipoDelComprobante(c);
+        var torneo = et != null ? et.getTorneo() : null;
+        var equipo = et != null ? et.getEquipo() : null;
         return ComprobanteDTO.builder()
                 .id(c.getId())
                 .tipo(c.getTipo().name())
                 .referenciaId(c.getReferenciaId())
+                .torneoId(torneo != null ? torneo.getId() : null)
+                .torneoNombre(torneo != null ? torneo.getNombre() : null)
+                .equipoTorneoId(et != null ? et.getId() : null)
+                .equipoNombre(equipo != null ? equipo.getNombre() : null)
                 .urlArchivo(c.getUrlArchivo())
                 .subidoPor(directorioPersonas.nombreDeCuenta(c.getSubidoPorCuentaId()))
                 .estado(c.getEstado().name())

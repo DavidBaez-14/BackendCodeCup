@@ -119,12 +119,15 @@ class PremiosSinDuplicadosTest extends AuthTestSupport {
         }
     }
 
+    /** Spec 0024: el admin lo es de este torneo, no global. */
     private Torneo torneo() {
-        return torneoRepository.save(Torneo.builder()
+        var torneo = torneoRepository.save(Torneo.builder()
                 .nombre("Copa " + UUID.randomUUID().toString().substring(0, 8))
                 .edicion(2026)
                 .estado(EstadoTorneo.PUBLICADO)
                 .build());
+        hacerAdmin(admin, torneo.getId());
+        return torneo;
     }
 
     /** El cuerpo que manda la web: descripcion siempre null; codigoCatalogo solo al crear. */

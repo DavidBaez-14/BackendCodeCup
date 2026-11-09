@@ -14,7 +14,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/supercopa/admin/partidos")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('ADMINISTRADOR','ARBITRO')")
+@PreAuthorize("hasRole('ARBITRO') or @authz.adminDePartido(#partidoId)")
 public class AdminPartidoController {
 
     private final PartidoAdminService partidoAdminService;
@@ -91,7 +91,7 @@ public class AdminPartidoController {
     // ── Admin-only ─────────────────────────────────────────────
 
     @PostMapping("/{partidoId}/reabrir")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("@authz.adminDePartido(#partidoId)")
     public ResponseEntity<PartidoAdminDTO> reabrirPartido(@PathVariable UUID partidoId) {
         return ResponseEntity.ok(partidoAdminService.reabrirPartido(partidoId));
     }

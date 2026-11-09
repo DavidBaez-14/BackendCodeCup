@@ -41,7 +41,7 @@ class BootstrapAdminTest {
     void creaInvitacionSiNoHayAdminNiCuenta() {
         when(cuentaRolRepository.countByRolAndEstado(Rol.ADMINISTRADOR, EstadoRol.APROBADO)).thenReturn(0L);
         when(cuentaRepository.findFirstByCorreo("admin@ufps.edu.co")).thenReturn(Optional.empty());
-        when(invitacionRepository.existsByCorreoAndRolAndEstado("admin@ufps.edu.co", Rol.ADMINISTRADOR,
+        when(invitacionRepository.existsByCorreoAndRolAndEstadoAndAmbitoIsNull("admin@ufps.edu.co", Rol.ADMINISTRADOR,
                 EstadoInvitacion.PENDIENTE)).thenReturn(false);
 
         bootstrap.ejecutar("  Admin@UFPS.edu.co ");

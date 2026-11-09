@@ -27,7 +27,7 @@ import terminus.co.edu.ufps.codecup.shared.security.JwtClaims;
 @RestController
 @RequestMapping("/api/admin/roles")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMINISTRADOR')")
+@PreAuthorize("hasRole('SUPERADMIN')")
 public class AdminRolesController {
 
     private final AdminRolesService adminRolesService;

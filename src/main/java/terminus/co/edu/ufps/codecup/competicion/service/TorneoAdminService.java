@@ -53,9 +53,12 @@ public class TorneoAdminService {
     private final TituloRepository tituloRepo;
     private final ComprobanteRepository comprobanteRepo;
     private final DirectorioPersonas directorioPersonas;
+    private final RolesTorneoService rolesTorneoService;
+    private final PermisosTorneo permisos;
 
+    /** Spec 0024: quien lo crea queda como su admin (sin rol global). */
     @Transactional
-    public TorneoDTO crear(CrearTorneoRequest req) {
+    public TorneoDTO crear(CrearTorneoRequest req, UUID creadorCuentaId) {
         if (req.getNombre() == null || req.getNombre().isBlank()) {
             throw new RuntimeException("El nombre del torneo es obligatorio.");
         }
@@ -72,15 +75,22 @@ public class TorneoAdminService {
                 .exigeDocumento(Boolean.TRUE.equals(req.getExigeDocumento()))
                 .build();
         torneoRepo.save(torneo);
+        rolesTorneoService.registrarCreador(torneo, creadorCuentaId);
         return toDTO(torneo);
     }
 
+    /**
+     * Spec 0024: los torneos que la cuenta administra. Con {@code todosComoArbitroGlobal} (el rol
+     * ARBITRO global, que la 0025 reemplaza por árbitros por torneo) se ven todos, como antes.
+     */
     @Transactional(readOnly = true)
-    public List<TorneoDTO> listar() {
-        return torneoRepo.findAllByOrderByEdicionDesc()
-                .stream()
-                .map(this::toDTO)
-                .toList();
+    public List<TorneoDTO> listarDeStaff(UUID cuentaId, boolean todosComoArbitroGlobal) {
+        var torneos = todosComoArbitroGlobal
+                ? torneoRepo.findAllByOrderByEdicionDesc()
+                : torneoRepo.findAllById(permisos.torneosQueAdministra(cuentaId)).stream()
+                        .sorted(java.util.Comparator.comparing(Torneo::getEdicion, java.util.Comparator.reverseOrder()))
+                        .toList();
+        return torneos.stream().map(this::toDTO).toList();
     }
 
     @Transactional

@@ -113,8 +113,68 @@ public abstract class AuthTestSupport {
                 .content(objectMapper.writeValueAsString(body)));
     }
 
-    /** Crea directo en la BD una cuenta con los roles dados (sin pasar por el API). */
+    /**
+     * Crea directo en la BD una cuenta con los roles dados (sin pasar por el API). Como en
+     * producción (RolesCuenta.otorgar), ADMINISTRADOR trae SUPERADMIN: el panel de Usuarios.
+     * Desde la spec 0024 ningún rol global da acceso a un torneo: usa {@link #hacerAdmin}.
+     */
     protected Usuario cuentaConRoles(Rol... roles) {
+        var lista = new java.util.ArrayList<>(java.util.Arrays.asList(roles));
+        if (lista.contains(Rol.ADMINISTRADOR) && !lista.contains(Rol.SUPERADMIN)) {
+            lista.add(Rol.SUPERADMIN);
+        }
+        return cuentaConRolesExactos(lista.toArray(Rol[]::new));
+    }
+
+    @Autowired
+    protected terminus.co.edu.ufps.codecup.competicion.repository.TorneoRepository soporteTorneos;
+
+    @Autowired
+    protected terminus.co.edu.ufps.codecup.competicion.repository.TorneoRolRepository soporteRolesTorneo;
+
+    @Autowired
+    protected terminus.co.edu.ufps.codecup.competicion.repository.PartidoRepository soportePartidos;
+
+    protected UUID cuentaIdDe(Usuario u) {
+        return cuentaRepository.findConPersona(Cuenta.PROVEEDOR_SUPABASE, u.sub()).orElseThrow().getId();
+    }
+
+    /** Spec 0024: hace a la cuenta admin de ese torneo. */
+    protected void hacerAdmin(Usuario u, UUID torneoId) {
+        darRolDeTorneo(u, torneoId, terminus.co.edu.ufps.codecup.competicion.model.RolTorneo.ADMIN);
+    }
+
+    protected terminus.co.edu.ufps.codecup.competicion.model.TorneoRol darRolDeTorneo(
+            Usuario u, UUID torneoId, terminus.co.edu.ufps.codecup.competicion.model.RolTorneo rol) {
+        return soporteRolesTorneo.save(terminus.co.edu.ufps.codecup.competicion.model.TorneoRol.builder()
+                .torneo(soporteTorneos.getReferenceById(torneoId))
+                .cuentaId(cuentaIdDe(u))
+                .rol(rol)
+                .creadoEn(LocalDateTime.now())
+                .build());
+    }
+
+    /** Un torneo mínimo, guardado directo en la BD. */
+    protected terminus.co.edu.ufps.codecup.competicion.model.Torneo torneoDePrueba(
+            terminus.co.edu.ufps.codecup.competicion.model.EstadoTorneo estado) {
+        return soporteTorneos.save(terminus.co.edu.ufps.codecup.competicion.model.Torneo.builder()
+                .nombre("Torneo " + UUID.randomUUID().toString().substring(0, 8))
+                .edicion(2026)
+                .estado(estado)
+                .build());
+    }
+
+    /** Un partido sin equipos (basta para probar permisos). */
+    protected terminus.co.edu.ufps.codecup.competicion.model.Partido partidoDePrueba(
+            terminus.co.edu.ufps.codecup.competicion.model.Torneo torneo) {
+        return soportePartidos.save(terminus.co.edu.ufps.codecup.competicion.model.Partido.builder()
+                .torneo(torneo)
+                .fecha(LocalDateTime.now().plusDays(1))
+                .build());
+    }
+
+    /** Como {@link #cuentaConRoles}, pero sin agregar nada. */
+    protected Usuario cuentaConRolesExactos(Rol... roles) {
         Usuario u = usuario();
         var persona = personaRepository.save(Persona.builder()
                 .nombres("Admin").apellidos("Prueba")

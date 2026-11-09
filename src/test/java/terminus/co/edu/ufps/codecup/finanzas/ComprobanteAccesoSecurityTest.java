@@ -87,13 +87,26 @@ class ComprobanteAccesoSecurityTest extends AuthTestSupport {
     }
 
     @Test
-    void downloadUrl_comoAdmin_devuelve200() throws Exception {
+    void downloadUrl_comoAdminDelTorneo_devuelve200() throws Exception {
+        var a = inscripcion(EstadoInscripcion.PENDIENTE_PAGO);
+        var comprobante = comprobanteDe(a);
+        var admin = cuentaConRoles(Rol.JUGADOR);
+        hacerAdmin(admin, a.inscripcion().getTorneo().getId());
+
+        descargar(comprobante.getId(), admin)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.url").value("https://storage/firmada"));
+    }
+
+    /** Spec 0024: el rol global ADMINISTRADOR ya no abre los comprobantes de un torneo ajeno. */
+    @Test
+    void downloadUrl_adminGlobalSinElTorneo_devuelve403() throws Exception {
         var a = inscripcion(EstadoInscripcion.PENDIENTE_PAGO);
         var comprobante = comprobanteDe(a);
 
         descargar(comprobante.getId(), cuentaConRoles(Rol.ADMINISTRADOR))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.url").value("https://storage/firmada"));
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("COMPROBANTE_AJENO"));
     }
 
     @Test

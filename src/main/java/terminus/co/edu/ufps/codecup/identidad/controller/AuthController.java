@@ -19,7 +19,9 @@ import terminus.co.edu.ufps.codecup.identidad.dto.MeResponseDTO;
 import terminus.co.edu.ufps.codecup.identidad.dto.RegistroRequestDTO;
 import terminus.co.edu.ufps.codecup.identidad.dto.SolicitarRolRequestDTO;
 import terminus.co.edu.ufps.codecup.identidad.dto.SolicitudRolResponseDTO;
+import terminus.co.edu.ufps.codecup.identidad.dto.InvitacionVistaDTO;
 import terminus.co.edu.ufps.codecup.identidad.service.AuthService;
+import terminus.co.edu.ufps.codecup.identidad.service.InvitacionService;
 
 /**
  * El cliente inicia sesión directo con Supabase y manda su access token en
@@ -32,6 +34,7 @@ import terminus.co.edu.ufps.codecup.identidad.service.AuthService;
 public class AuthController {
 
     private final AuthService authService;
+    private final InvitacionService invitacionService;
 
     /** Cuenta de CodeCup de quien llama. 404 CUENTA_NO_REGISTRADA si aún debe completar el registro. */
     @GetMapping("/me")
@@ -62,6 +65,15 @@ public class AuthController {
     public ResponseEntity<SolicitudRolResponseDTO> solicitarRol(@AuthenticationPrincipal Jwt jwt,
                                                                 @Valid @RequestBody SolicitarRolRequestDTO req) {
         return ResponseEntity.ok(authService.solicitarRol(jwt.getSubject(), req));
+    }
+
+    /**
+     * Spec 0024 (pantalla N-4): qué es la invitación antes de aceptarla. Se puede consultar sin
+     * sesión, para mostrarla también a quien todavía no tiene cuenta.
+     */
+    @GetMapping("/invitaciones/{token}")
+    public ResponseEntity<InvitacionVistaDTO> verInvitacion(@PathVariable String token) {
+        return ResponseEntity.ok(invitacionService.vistaPrevia(token));
     }
 
     @PostMapping("/invitaciones/{token}/aceptar")

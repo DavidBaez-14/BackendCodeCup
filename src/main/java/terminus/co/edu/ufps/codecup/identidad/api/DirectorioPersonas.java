@@ -99,6 +99,28 @@ public class DirectorioPersonas {
         return nombres;
     }
 
+    /** Spec 0024: varias cuentas con su persona, nombre y correo. Las que no existen no aparecen. */
+    @Transactional(readOnly = true)
+    public Map<UUID, CuentaResumen> cuentas(Collection<UUID> cuentaIds) {
+        List<UUID> ids = cuentaIds.stream().filter(java.util.Objects::nonNull).distinct().toList();
+        if (ids.isEmpty()) return Map.of();
+        Map<UUID, CuentaResumen> resultado = new HashMap<>();
+        for (Cuenta c : cuentaRepository.findConPersonaByIdIn(ids)) {
+            var p = c.getPersona();
+            resultado.put(c.getId(), new CuentaResumen(c.getId(), p != null ? p.getId() : null,
+                    p != null ? p.nombreCompleto() : c.getCorreo(), c.getCorreo(),
+                    c.getEstado() == EstadoCuenta.BLOQUEADA));
+        }
+        return resultado;
+    }
+
+    /** Cuenta de una persona, si la tiene (spec 0026: reasignar el delegado). */
+    @Transactional(readOnly = true)
+    public Optional<UUID> cuentaDePersona(UUID personaId) {
+        if (personaId == null) return Optional.empty();
+        return cuentaRepository.findByPersonaId(personaId).map(Cuenta::getId);
+    }
+
     /** Nombre de una cuenta, o null si no hay cuenta (por ejemplo, una acción del seed). */
     @Transactional(readOnly = true)
     public String nombreDeCuenta(UUID cuentaId) {

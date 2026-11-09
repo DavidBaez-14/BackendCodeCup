@@ -15,6 +15,11 @@ public class ComprobanteDTO {
     private UUID id;
     private String tipo;
     private UUID referenciaId;
+    /** Spec 0024: para agrupar la bandeja por torneo. Null si la inscripción o la multa ya no existe. */
+    private UUID torneoId;
+    private String torneoNombre;
+    private UUID equipoTorneoId;
+    private String equipoNombre;
     private String urlArchivo;
     /** Nombre de quien lo subió. */
     private String subidoPor;

@@ -124,12 +124,15 @@ public class AdminRolesService {
                 .orElseThrow(() -> ApiException.notFound("ROL_NO_ASIGNADO",
                         "La cuenta no tiene el rol " + rol.name() + " aprobado."));
 
-        if (rol == Rol.ADMINISTRADOR) {
+        if (rol == Rol.ADMINISTRADOR || rol == Rol.SUPERADMIN) {
             if (cuenta.getId().equals(callerCuentaId)) {
                 throw ApiException.badRequest("AUTO_REVOCACION",
                         "No puedes revocarte tu propio rol de administrador. Pide a otro administrador que lo haga.");
             }
             exigirOtroAdmin("No se puede revocar al único administrador del sistema.");
+            // Spec 0024: ADMINISTRADOR y SUPERADMIN van juntos (ver RolesCuenta.otorgar).
+            Rol pareja = rol == Rol.ADMINISTRADOR ? Rol.SUPERADMIN : Rol.ADMINISTRADOR;
+            cuentaRolRepository.findByCuentaIdAndRol(cuenta.getId(), pareja).ifPresent(cuentaRolRepository::delete);
         }
 
         cuentaRolRepository.delete(cr);

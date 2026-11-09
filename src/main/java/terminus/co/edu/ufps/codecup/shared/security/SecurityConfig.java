@@ -38,6 +38,8 @@ public class SecurityConfig {
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
+                        // Spec 0024: ver una invitación antes de tener cuenta (pantalla N-4).
+                        .requestMatchers(HttpMethod.GET, "/api/auth/invitaciones/*").permitAll()
                         // Analytics: consulta pública (tablas, goleadores, premios).
                         .requestMatchers(HttpMethod.GET, "/api/analytics/**").permitAll()
                         // Disparadores de snapshots: se autentican con el shared secret

@@ -136,7 +136,7 @@ public class AuthService {
     @Transactional
     public SolicitudRolResponseDTO solicitarRol(String sub, SolicitarRolRequestDTO req) {
         var cuenta = cuentaDe(sub);
-        if (req.getRol() == Rol.ADMINISTRADOR || req.getRol() == Rol.JUGADOR) {
+        if (req.getRol() == Rol.ADMINISTRADOR || req.getRol() == Rol.SUPERADMIN || req.getRol() == Rol.JUGADOR) {
             throw ApiException.badRequest("ROL_NO_SOLICITABLE",
                     "Solo se puede solicitar DELEGADO o ARBITRO. JUGADOR ya lo tienes desde el registro.");
         }

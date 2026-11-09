@@ -11,9 +11,17 @@ public class InvitacionDTO {
 
     private UUID id;
 
+    /** Null en una invitación por enlace (spec 0024): la acepta cualquier cuenta con el enlace. */
     private String correo;
 
     private String rol;
+
+    /** Null = a la plataforma; TORNEO = el rol vale solo en {@link #ambitoId} (spec 0024). */
+    private String ambito;
+
+    private UUID ambitoId;
+
+    private String ambitoDescripcion;
 
     private String estado;
 

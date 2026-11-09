@@ -54,7 +54,7 @@ final class DatosDePrueba {
     static List<UsuarioPrueba> usuarios() {
         List<UsuarioPrueba> lista = new ArrayList<>();
         lista.add(new UsuarioPrueba("admin01", "Laura", "Méndez", "9000000001",
-                List.of(Rol.ADMINISTRADOR, Rol.JUGADOR), perfil(0)));
+                List.of(Rol.SUPERADMIN, Rol.ADMINISTRADOR, Rol.JUGADOR), perfil(0)));
         lista.add(new UsuarioPrueba("arbitro01", "Carlos", "Ramírez", "9000000101",
                 List.of(Rol.ARBITRO, Rol.JUGADOR), perfil(1)));
         lista.add(new UsuarioPrueba("arbitro02", "Diana", "Torres", "9000000102",

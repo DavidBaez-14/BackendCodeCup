@@ -21,12 +21,16 @@ public class RolesCuenta {
     /**
      * Deja el rol aprobado, sea nuevo o una solicitud previa. Idempotente.
      * Regla heredada de MS1: todo ADMINISTRADOR también es DELEGADO (y JUGADOR,
-     * que ya tiene desde el registro).
+     * que ya tiene desde el registro). Desde la spec 0024, ADMINISTRADOR y SUPERADMIN
+     * van juntos: la web muestra el panel de Usuarios con ADMINISTRADOR y el backend lo
+     * autoriza con SUPERADMIN.
      */
     @Transactional
     public void otorgar(Cuenta cuenta, Rol rol, String motivo) {
         aprobar(cuenta, rol, motivo);
-        if (rol == Rol.ADMINISTRADOR) {
+        if (rol == Rol.ADMINISTRADOR || rol == Rol.SUPERADMIN) {
+            aprobar(cuenta, Rol.ADMINISTRADOR, motivo);
+            aprobar(cuenta, Rol.SUPERADMIN, motivo);
             aprobar(cuenta, Rol.DELEGADO, motivo);
         }
     }

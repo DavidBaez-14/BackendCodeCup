@@ -15,7 +15,7 @@ import terminus.co.edu.ufps.codecup.identidad.service.AdminCuentasService;
 @RestController
 @RequestMapping("/api/admin/cuentas")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMINISTRADOR')")
+@PreAuthorize("hasRole('SUPERADMIN')")
 public class AdminCuentasController {
 
     private final AdminCuentasService adminCuentasService;

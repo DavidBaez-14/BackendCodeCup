@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import terminus.co.edu.ufps.codecup.identidad.model.AmbitoInvitacion;
 import terminus.co.edu.ufps.codecup.identidad.model.EstadoInvitacion;
 import terminus.co.edu.ufps.codecup.identidad.model.Invitacion;
 import terminus.co.edu.ufps.codecup.identidad.model.Rol;
@@ -16,7 +17,15 @@ public interface InvitacionRepository extends JpaRepository<Invitacion, UUID> {
 
     boolean existsByCorreoAndRolAndEstado(String correo, Rol rol, EstadoInvitacion estado);
 
-    List<Invitacion> findAllByOrderByCreatedAtDesc();
+    boolean existsByCorreoAndRolAndEstadoAndAmbitoIsNull(String correo, Rol rol, EstadoInvitacion estado);
 
-    List<Invitacion> findByEstadoOrderByCreatedAtDesc(EstadoInvitacion estado);
+    boolean existsByCorreoAndRolAndAmbitoAndAmbitoIdAndEstado(String correo, Rol rol, AmbitoInvitacion ambito,
+                                                              UUID ambitoId, EstadoInvitacion estado);
+
+    List<Invitacion> findByAmbitoIsNullOrderByCreatedAtDesc();
+
+    List<Invitacion> findByAmbitoIsNullAndEstadoOrderByCreatedAtDesc(EstadoInvitacion estado);
+
+    List<Invitacion> findByAmbitoAndAmbitoIdAndEstadoOrderByCreatedAtDesc(AmbitoInvitacion ambito, UUID ambitoId,
+                                                                         EstadoInvitacion estado);
 }

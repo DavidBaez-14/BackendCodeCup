@@ -47,20 +47,21 @@ public class VinculacionService {
     private final PremioAsignadoRepository premioAsignadoRepo;
     private final PerfilDeportivoRepository perfilRepo;
     private final MultaRepository multaRepo;
+    private final PermisosTorneo permisos;
 
     /** El admin ve todas; un delegado, solo las de personas que estuvieron en alguno de sus planteles. */
     @Transactional(readOnly = true)
-    public List<VinculoPendienteDTO> pendientes(UUID personaQueConsulta, boolean esAdmin) {
-        var solicitudes = esAdmin
+    public List<VinculoPendienteDTO> pendientes(UUID personaQueConsulta, UUID cuentaQueConsulta, boolean esSuperadmin) {
+        var solicitudes = esSuperadmin
                 ? vinculosPersona.pendientes()
-                : vinculosPersona.pendientesHacia(personasEnPlantelesDe(personaQueConsulta));
+                : vinculosPersona.pendientesHacia(personasQuePuedeResolver(personaQueConsulta, cuentaQueConsulta));
         return solicitudes.stream().map(this::toDTO).toList();
     }
 
     @Transactional
-    public void aprobar(UUID vinculoId, UUID personaQueAprueba, UUID cuentaQueAprueba, boolean esAdmin) {
+    public void aprobar(UUID vinculoId, UUID personaQueAprueba, UUID cuentaQueAprueba, boolean esSuperadmin) {
         var vinculo = vinculosPersona.requerirPendiente(vinculoId);
-        exigirPermiso(vinculo.personaId(), personaQueAprueba, esAdmin);
+        exigirPermiso(vinculo.personaId(), personaQueAprueba, cuentaQueAprueba, esSuperadmin);
 
         // Sin fusiones en la v1: la persona actual de la cuenta no puede tener historial.
         UUID anterior = vinculo.personaActualId();
@@ -75,9 +76,9 @@ public class VinculacionService {
     }
 
     @Transactional
-    public void rechazar(UUID vinculoId, String motivo, UUID personaQueRechaza, UUID cuentaQueRechaza, boolean esAdmin) {
+    public void rechazar(UUID vinculoId, String motivo, UUID personaQueRechaza, UUID cuentaQueRechaza, boolean esSuperadmin) {
         var vinculo = vinculosPersona.requerirPendiente(vinculoId);
-        exigirPermiso(vinculo.personaId(), personaQueRechaza, esAdmin);
+        exigirPermiso(vinculo.personaId(), personaQueRechaza, cuentaQueRechaza, esSuperadmin);
         vinculosPersona.rechazar(vinculoId, cuentaQueRechaza, motivo);
     }
 
@@ -144,12 +145,26 @@ public class VinculacionService {
                 || multaRepo.existsByPersonaId(personaId);
     }
 
-    private void exigirPermiso(UUID personaReclamada, UUID quien, boolean esAdmin) {
-        if (esAdmin) return;
-        if (!personasEnPlantelesDe(quien).contains(personaReclamada)) {
+    /**
+     * Spec 0024: resuelve el SUPERADMIN, el delegado de un equipo donde estuvo esa persona o un admin
+     * de un torneo donde estuvo. Ya no basta con el rol global ADMINISTRADOR.
+     */
+    private void exigirPermiso(UUID personaReclamada, UUID quien, UUID cuentaDeQuien, boolean esSuperadmin) {
+        if (esSuperadmin) return;
+        if (!personasQuePuedeResolver(quien, cuentaDeQuien).contains(personaReclamada)) {
             throw ApiException.forbidden("VINCULO_AJENO",
-                    "Solo el delegado de un equipo donde estuvo esa persona (o un admin) puede resolver esta solicitud.");
+                    "Solo el delegado de un equipo donde estuvo esa persona (o un admin de ese torneo) puede resolver esta solicitud.");
         }
+    }
+
+    /** Las de sus planteles como delegado y las de los torneos que administra. */
+    private Set<UUID> personasQuePuedeResolver(UUID persona, UUID cuenta) {
+        var personas = new java.util.HashSet<>(personasEnPlantelesDe(persona));
+        var torneos = permisos.torneosQueAdministra(cuenta);
+        if (!torneos.isEmpty()) {
+            jugadorEquipoRepo.findByTorneoIdIn(torneos).forEach(je -> personas.add(je.getPersonaId()));
+        }
+        return personas;
     }
 
     /** Personas que estuvieron en los planteles de las inscripciones donde {@code delegado} es el delegado. */

@@ -28,19 +28,19 @@ public class MultaController {
     }
 
     @GetMapping("/activas")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("@authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<List<MultaDTO>> activas(@RequestParam UUID torneoId) {
         return ResponseEntity.ok(multaService.multasActivas(torneoId));
     }
 
     @GetMapping("/torneo/{torneoId}")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR','ARBITRO')")
+    @PreAuthorize("hasRole('ARBITRO') or @authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<List<MultaDTO>> porTorneo(@PathVariable UUID torneoId) {
         return ResponseEntity.ok(multaService.multasPorTorneo(torneoId));
     }
 
     @GetMapping("/torneo/{torneoId}/bolsa")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("@authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<?> bolsa(@PathVariable UUID torneoId) {
         var multas = multaService.multasPorTorneo(torneoId);
         var pagadas = multas.stream().filter(m -> "PAGADA".equals(m.getEstado())).toList();
@@ -105,13 +105,13 @@ public class MultaController {
     }
 
     @GetMapping("/elegibilidad/{personaId}")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR','DELEGADO','ARBITRO') or hasAuthority('SCOPE_internal')")
+    @PreAuthorize("hasAnyRole('DELEGADO','ARBITRO') or hasAuthority('SCOPE_internal') or @authz.adminDeAlgunTorneo()")
     public ResponseEntity<Boolean> elegible(@PathVariable UUID personaId) {
         return ResponseEntity.ok(!multaService.jugadorTieneDeudas(personaId));
     }
 
     @GetMapping("/elegibilidad/{personaId}/detalle")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR','ARBITRO')")
+    @PreAuthorize("hasRole('ARBITRO') or @authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<ElegibilidadResponse> elegibilidadDetalle(
             @PathVariable UUID personaId,
             @RequestParam UUID torneoId) {
@@ -123,7 +123,7 @@ public class MultaController {
     }
 
     @GetMapping("/jugador/{personaId}/pendientes")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR','ARBITRO')")
+    @PreAuthorize("hasRole('ARBITRO') or @authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<List<MultaDTO>> pendientesJugador(
             @PathVariable UUID personaId,
             @RequestParam UUID torneoId) {
@@ -131,7 +131,7 @@ public class MultaController {
     }
 
     @PostMapping("/{multaId}/registrar-pago")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR','ARBITRO')")
+    @PreAuthorize("hasRole('ARBITRO') or @authz.adminDeMulta(#multaId)")
     public ResponseEntity<MultaDTO> registrarPago(
             @PathVariable UUID multaId,
             @RequestBody RegistrarPagoTodasRequest req,
@@ -141,7 +141,7 @@ public class MultaController {
     }
 
     @PostMapping("/jugador/{personaId}/registrar-pago-todas")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR','ARBITRO')")
+    @PreAuthorize("hasRole('ARBITRO') or @authz.adminDeTorneo(#req.torneoId)")
     public ResponseEntity<RegistrarPagoResult> registrarPagoTodas(
             @PathVariable UUID personaId,
             @Valid @RequestBody RegistrarPagoTodasRequest req,
@@ -155,7 +155,7 @@ public class MultaController {
     }
 
     @GetMapping("/jugador/{personaId}/suspensiones")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR','ARBITRO')")
+    @PreAuthorize("hasRole('ARBITRO') or @authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<List<MultaDTO>> suspensiones(
             @PathVariable UUID personaId,
             @RequestParam UUID torneoId) {
@@ -163,13 +163,13 @@ public class MultaController {
     }
 
     @GetMapping("/partido/{partidoId}/bloqueados")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR','ARBITRO')")
+    @PreAuthorize("hasRole('ARBITRO') or @authz.adminDePartido(#partidoId)")
     public ResponseEntity<List<?>> bloqueados(@PathVariable UUID partidoId) {
         return ResponseEntity.ok(multaService.jugadoresBloqueados(partidoId));
     }
 
     @PostMapping("/{multaId}/habilitar-excepcion")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR','ARBITRO')")
+    @PreAuthorize("hasRole('ARBITRO') or @authz.adminDeMulta(#multaId)")
     public ResponseEntity<MultaDTO> habilitarExcepcion(
             @PathVariable UUID multaId,
             @Valid @RequestBody HabilitarExcepcionRequest req,
@@ -179,7 +179,7 @@ public class MultaController {
     }
 
     @PostMapping("/{id}/habilitar")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR','ARBITRO')")
+    @PreAuthorize("hasRole('ARBITRO') or @authz.adminDeMulta(#id)")
     public ResponseEntity<MultaDTO> habilitarLegacy(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt) {

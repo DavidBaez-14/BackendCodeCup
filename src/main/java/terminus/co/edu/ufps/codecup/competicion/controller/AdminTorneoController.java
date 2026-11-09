@@ -30,26 +30,33 @@ public class AdminTorneoController {
     private final FinanzasConfigService finanzasConfigService;
     private final PremioService premioService;
 
+    /** Spec 0024: cualquier cuenta registrada crea un torneo y queda como su admin. */
     @PostMapping
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
-    public ResponseEntity<TorneoDTO> crear(@RequestBody CrearTorneoRequest req) {
-        return ResponseEntity.ok(torneoAdminService.crear(req));
+    @PreAuthorize("@authz.registrado()")
+    public ResponseEntity<TorneoDTO> crear(@RequestBody CrearTorneoRequest req, @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(torneoAdminService.crear(req, JwtClaims.cuentaId(jwt)));
     }
 
+    /**
+     * Spec 0024: los torneos donde quien llama es admin. Un ARBITRO global (rol anterior a la
+     * 0025) sigue viéndolos todos, como antes.
+     */
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR','ARBITRO')")
-    public ResponseEntity<List<TorneoDTO>> listar() {
-        return ResponseEntity.ok(torneoAdminService.listar());
+    @PreAuthorize("@authz.registrado()")
+    public ResponseEntity<List<TorneoDTO>> listar(@AuthenticationPrincipal Jwt jwt,
+                                                  org.springframework.security.core.Authentication auth) {
+        boolean arbitroGlobal = auth.getAuthorities().stream().anyMatch(a -> "ROLE_ARBITRO".equals(a.getAuthority()));
+        return ResponseEntity.ok(torneoAdminService.listarDeStaff(JwtClaims.cuentaId(jwt), arbitroGlobal));
     }
 
     @PostMapping("/{torneoId}/publicar")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("@authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<TorneoDTO> publicar(@PathVariable UUID torneoId) {
         return ResponseEntity.ok(torneoAdminService.publicar(torneoId));
     }
 
     @PostMapping("/{torneoId}/iniciar")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("@authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<TorneoDTO> iniciar(@PathVariable UUID torneoId) {
         return ResponseEntity.ok(torneoAdminService.iniciar(torneoId));
     }
@@ -57,13 +64,13 @@ public class AdminTorneoController {
     // ── Configuracion de formato ──────────────────────────────────
 
     @GetMapping("/{torneoId}/configuracion")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("@authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<TorneoConfigDTO> obtenerConfiguracion(@PathVariable UUID torneoId) {
         return ResponseEntity.ok(torneoAdminService.obtenerConfiguracion(torneoId));
     }
 
     @PutMapping("/{torneoId}/configuracion")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("@authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<TorneoConfigDTO> guardarConfiguracion(
             @PathVariable UUID torneoId,
             @RequestBody GuardarConfigRequest req) {
@@ -73,13 +80,13 @@ public class AdminTorneoController {
     // ── Finanzas Config (Inscripcion + Multas) ───────────────────
 
     @GetMapping("/{torneoId}/finanzas-config")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("@authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<FinanzasConfigDTO> obtenerFinanzasConfig(@PathVariable UUID torneoId) {
         return ResponseEntity.ok(finanzasConfigService.obtenerConfig(torneoId));
     }
 
     @PutMapping("/{torneoId}/inscripcion-config")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("@authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<InscripcionConfigDTO> guardarInscripcionConfig(
             @PathVariable UUID torneoId,
             @RequestBody InscripcionConfigDTO req) {
@@ -88,7 +95,7 @@ public class AdminTorneoController {
 
     /** Spec 0023: el torneo exige (o no) documento a sus miembros. */
     @PutMapping("/{torneoId}/exige-documento")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("@authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<TorneoDTO> cambiarExigeDocumento(@PathVariable UUID torneoId,
                                                            @RequestBody java.util.Map<String, Boolean> req) {
         return ResponseEntity.ok(torneoAdminService.cambiarExigeDocumento(torneoId,
@@ -96,7 +103,7 @@ public class AdminTorneoController {
     }
 
     @PutMapping("/{torneoId}/multa-config")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("@authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<MultaConfigDTO> guardarMultaConfig(
             @PathVariable UUID torneoId,
             @RequestBody MultaConfigDTO req) {
@@ -106,13 +113,13 @@ public class AdminTorneoController {
     // ── Premios ──────────────────────────────────────────────────
 
     @GetMapping("/{torneoId}/premios")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("@authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<List<PremioDTO>> listarPremios(@PathVariable UUID torneoId) {
         return ResponseEntity.ok(premioService.listarPremios(torneoId));
     }
 
     @PostMapping("/{torneoId}/premios")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("@authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<PremioDTO> crearPremio(
             @PathVariable UUID torneoId,
             @RequestBody CrearPremioRequest req) {
@@ -120,7 +127,7 @@ public class AdminTorneoController {
     }
 
     @PutMapping("/{torneoId}/premios/{torneoPremioId}")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("@authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<PremioDTO> actualizarPremio(
             @PathVariable UUID torneoId,
             @PathVariable UUID torneoPremioId,
@@ -129,7 +136,7 @@ public class AdminTorneoController {
     }
 
     @DeleteMapping("/{torneoId}/premios/{torneoPremioId}")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("@authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<Void> eliminarPremio(
             @PathVariable UUID torneoId,
             @PathVariable UUID torneoPremioId) {
@@ -138,7 +145,7 @@ public class AdminTorneoController {
     }
 
     @PostMapping("/{torneoId}/premios/{torneoPremioId}/asignar")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR') or hasAuthority('SCOPE_internal')")
+    @PreAuthorize("hasAuthority('SCOPE_internal') or @authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<?> asignarPremio(
             @PathVariable UUID torneoId,
             @PathVariable UUID torneoPremioId,
@@ -147,7 +154,7 @@ public class AdminTorneoController {
     }
 
     @DeleteMapping("/{torneoId}/premios/{torneoPremioId}/asignar")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("@authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<Void> quitarAsignacion(
             @PathVariable UUID torneoId,
             @PathVariable UUID torneoPremioId) {
@@ -158,7 +165,7 @@ public class AdminTorneoController {
     // ── Cierre de torneo ────────────────────────────────────────
 
     @PostMapping("/{torneoId}/cerrar")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("@authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<TorneoDTO> cerrarTorneo(@PathVariable UUID torneoId) {
         return ResponseEntity.ok(torneoAdminService.cerrarTorneo(torneoId));
     }
@@ -166,13 +173,13 @@ public class AdminTorneoController {
     // ── Inscripciones ─────────────────────────────────────────────
 
     @GetMapping("/{torneoId}/inscripciones")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("@authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<List<InscripcionDTO>> inscripciones(@PathVariable UUID torneoId) {
         return ResponseEntity.ok(torneoAdminService.listarInscripciones(torneoId));
     }
 
     @PostMapping("/{torneoId}/inscripciones/{equipoTorneoId}/aprobar")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("@authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<InscripcionDTO> aprobarInscripcion(
             @PathVariable UUID torneoId,
             @PathVariable UUID equipoTorneoId,
@@ -182,7 +189,7 @@ public class AdminTorneoController {
     }
 
     @PostMapping("/{torneoId}/inscripciones/{equipoTorneoId}/rechazar")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("@authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<InscripcionDTO> rechazarInscripcion(
             @PathVariable UUID torneoId,
             @PathVariable UUID equipoTorneoId,
@@ -191,7 +198,7 @@ public class AdminTorneoController {
     }
 
     @PostMapping("/{torneoId}/inscripciones/{equipoTorneoId}/habilitar")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("@authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<InscripcionDTO> habilitarInscripcion(
             @PathVariable UUID torneoId,
             @PathVariable UUID equipoTorneoId) {
@@ -199,7 +206,7 @@ public class AdminTorneoController {
     }
 
     @PostMapping("/{torneoId}/inscripciones/{equipoTorneoId}/expulsar")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("@authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<InscripcionDTO> expulsarEquipo(
             @PathVariable UUID torneoId,
             @PathVariable UUID equipoTorneoId,
@@ -212,27 +219,27 @@ public class AdminTorneoController {
     // ── Fixture ──────────────────────────────────────────────────
 
     @PostMapping("/{torneoId}/fixture")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("@authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<List<PartidoAdminDTO>> generarFixture(@PathVariable UUID torneoId) {
         List<Partido> creados = fixtureService.generar(torneoId);
         return ResponseEntity.ok(creados.stream().map(partidoAdminService::toPartidoDTO).toList());
     }
 
     @DeleteMapping("/{torneoId}/fixture")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("@authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<Void> borrarFixture(@PathVariable UUID torneoId) {
         torneoAdminService.borrarFixture(torneoId);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{torneoId}/partidos")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR','ARBITRO')")
+    @PreAuthorize("hasRole('ARBITRO') or @authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<List<PartidoAdminDTO>> partidos(@PathVariable UUID torneoId) {
         return ResponseEntity.ok(partidoAdminService.listarPorTorneo(torneoId));
     }
 
     @GetMapping("/{torneoId}/clasificacion")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR','ARBITRO')")
+    @PreAuthorize("hasRole('ARBITRO') or @authz.adminDeTorneo(#torneoId)")
     public ResponseEntity<Map<String, List<PosicionGrupoDTO>>> clasificacion(@PathVariable UUID torneoId) {
         return ResponseEntity.ok(clasificacionService.calcularPorGrupo(torneoId));
     }

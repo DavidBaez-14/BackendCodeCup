@@ -59,7 +59,7 @@ public class BootstrapAdmin implements ApplicationRunner {
             log.info("[BOOTSTRAP] ADMINISTRADOR asignado a la cuenta {}", cuenta.get().getId());
             return;
         }
-        if (!invitacionRepository.existsByCorreoAndRolAndEstado(correo, Rol.ADMINISTRADOR, EstadoInvitacion.PENDIENTE)) {
+        if (!invitacionRepository.existsByCorreoAndRolAndEstadoAndAmbitoIsNull(correo, Rol.ADMINISTRADOR, EstadoInvitacion.PENDIENTE)) {
             invitacionService.crearDelSistema(correo, Rol.ADMINISTRADOR);
             log.info("[BOOTSTRAP] Invitación de ADMINISTRADOR creada; se aplica cuando ese correo complete el registro.");
         }

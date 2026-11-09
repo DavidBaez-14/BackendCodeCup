@@ -27,7 +27,7 @@ import terminus.co.edu.ufps.codecup.shared.security.JwtClaims;
 @RestController
 @RequestMapping("/api/admin/invitaciones")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMINISTRADOR')")
+@PreAuthorize("hasRole('SUPERADMIN')")
 public class AdminInvitacionesController {
 
     private final InvitacionService invitacionService;

@@ -88,6 +88,10 @@ class FlywayBaselineTest {
                 insert into identidad.cuentas (id, proveedor, proveedor_sub, correo, persona_id, estado, fecha_creacion) values
                   ('%3$s', 'SUPABASE', 'sub-ana', 'ana@prueba.local', '%1$s', 'ACTIVA', now()),
                   ('%4$s', 'SUPABASE', 'sub-admin', 'admin@prueba.local', '%2$s', 'ACTIVA', now());
+                insert into identidad.cuenta_roles (cuenta_id, rol, estado, fecha_solicitud) values
+                  ('%4$s', 'ADMINISTRADOR', 'APROBADO', now()),
+                  ('%4$s', 'JUGADOR', 'APROBADO', now()),
+                  ('%3$s', 'JUGADOR', 'APROBADO', now());
                 insert into competicion.jugadores (cedula, nombre, correo, altura_cm, posicion, created_at) values
                   ('1001', 'Ana Registrada', 'ana@prueba.local', 170, 'DEFENSA', now()),
                   ('3003', 'Beto SinCuenta', null, null, null, now());
@@ -148,7 +152,7 @@ class FlywayBaselineTest {
         var versiones = jdbc.queryForList(
                 "select version from identidad.flyway_schema_history where success and version is not null order by installed_rank",
                 String.class);
-        assertThat(versiones).containsExactly("1", "2", "3", "4", "5", "6");
+        assertThat(versiones).containsExactly("1", "2", "3", "4", "5", "6", "7");
 
         var schemas = jdbc.queryForList(
                 "select schema_name from information_schema.schemata where schema_name in ('identidad','competicion','finanzas','analytics')",
@@ -166,6 +170,36 @@ class FlywayBaselineTest {
                         + "and table_name in ('cuentas','cuenta_roles','jugadores')",
                 String.class);
         assertThat(quedan).isEmpty();
+    }
+
+    /**
+     * Spec 0024, Q1 (a): el ADMINISTRADOR global queda como ADMIN de cada torneo que ya existía y
+     * como SUPERADMIN. Las demás cuentas no reciben nada.
+     */
+    @Test
+    void v7_elAdminGlobalQuedaComoAdminDeLosTorneosExistentes_yComoSuperadmin() {
+        var torneosDelAdmin = jdbc.queryForList(
+                "select torneo_id from competicion.torneo_roles where cuenta_id = ? and rol = 'ADMIN'",
+                UUID.class, C_ADMIN);
+        assertThat(torneosDelAdmin).containsExactlyInAnyOrder(TORNEO, TORNEO_2);
+        assertThat(jdbc.queryForObject(
+                "select count(*) from identidad.cuenta_roles where cuenta_id = ? and rol = 'SUPERADMIN' and estado = 'APROBADO'",
+                Integer.class, C_ADMIN)).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "select count(*) from competicion.torneo_roles where cuenta_id = ?", Integer.class, C_DELEGADA)).isZero();
+        assertThat(jdbc.queryForObject(
+                "select count(*) from identidad.cuenta_roles where rol = 'SUPERADMIN' and cuenta_id = ?",
+                Integer.class, C_DELEGADA)).isZero();
+    }
+
+    /** Spec 0024: una invitación a la plataforma sigue necesitando correo; una con ámbito, no. */
+    @Test
+    void v7_invitacionSinCorreoSoloConAmbito() {
+        var error = org.assertj.core.api.Assertions.catchThrowable(() -> jdbc.update(
+                "insert into identidad.invitaciones (token, rol, estado, created_at) values ('t-sin-correo', 'ARBITRO', 'PENDIENTE', now())"));
+        assertThat(error).hasMessageContaining("invitaciones_correo_o_ambito_check");
+        jdbc.update("insert into identidad.invitaciones (token, rol, estado, created_at, ambito, ambito_id) "
+                + "values ('t-enlace', 'ADMINISTRADOR', 'PENDIENTE', now(), 'TORNEO', ?)", TORNEO);
     }
 
     @Test

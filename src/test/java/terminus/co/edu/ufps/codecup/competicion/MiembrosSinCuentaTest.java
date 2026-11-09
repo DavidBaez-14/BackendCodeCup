@@ -269,6 +269,7 @@ class MiembrosSinCuentaTest extends AuthTestSupport {
                 .andExpect(status().isNoContent());
 
         // Bloquear no borra la competición: sigue en el plantel donde estaba.
+        hacerAdmin(admin, a.torneo().getId());
         mvc.perform(get("/api/supercopa/admin/equipo-torneo/{id}/miembros", a.inscripcion().getId())
                         .header("Authorization", admin.bearer()))
                 .andExpect(status().isOk())
@@ -363,6 +364,7 @@ class MiembrosSinCuentaTest extends AuthTestSupport {
                 .andExpect(jsonPath("$[?(@.numeroDocumento == '%s')].nombre", doc).value(contains(NOMBRE_REGISTRADO)));
 
         var admin = cuentaConRoles(Rol.ADMINISTRADOR);
+        hacerAdmin(admin, partido.getTorneo().getId());
         mvc.perform(get("/api/supercopa/admin/partidos/{id}/eventos", partido.getId())
                         .header("Authorization", admin.bearer()))
                 .andExpect(status().isOk())
@@ -392,6 +394,7 @@ class MiembrosSinCuentaTest extends AuthTestSupport {
         agregar(m, cuerpo(sinCuenta, "Sara Gómez")).andExpect(status().isOk());
 
         var admin = cuentaConRoles(Rol.ADMINISTRADOR);
+        hacerAdmin(admin, m.torneo().getId());
         UUID id = m.inscripcion().getId();
         var pedidos = List.of(
                 get("/api/supercopa/delegado/equipo-torneo/{id}/miembros", id)

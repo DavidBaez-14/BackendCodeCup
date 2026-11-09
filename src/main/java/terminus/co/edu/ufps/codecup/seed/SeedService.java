@@ -23,7 +23,10 @@ import terminus.co.edu.ufps.codecup.competicion.model.FormatoTorneo;
 import terminus.co.edu.ufps.codecup.competicion.model.PerfilDeportivo;
 import terminus.co.edu.ufps.codecup.competicion.model.JugadorEquipo;
 import terminus.co.edu.ufps.codecup.competicion.model.Partido;
+import terminus.co.edu.ufps.codecup.competicion.model.RolTorneo;
 import terminus.co.edu.ufps.codecup.competicion.model.Torneo;
+import terminus.co.edu.ufps.codecup.competicion.model.TorneoRol;
+import terminus.co.edu.ufps.codecup.competicion.repository.TorneoRolRepository;
 import terminus.co.edu.ufps.codecup.competicion.repository.EquipoRepository;
 import terminus.co.edu.ufps.codecup.competicion.repository.EquipoTorneoRepository;
 import terminus.co.edu.ufps.codecup.competicion.repository.JugadorEquipoRepository;
@@ -54,7 +57,8 @@ public final class SeedService {
 
     /** Los repositorios que toca el seed. */
     public record Repositorios(PersonaRepository personas, CuentaRepository cuentas, CuentaRolRepository roles,
-                               PerfilDeportivoRepository perfiles, TorneoRepository torneos, EquipoRepository equipos,
+                               PerfilDeportivoRepository perfiles, TorneoRepository torneos,
+                               TorneoRolRepository torneoRoles, EquipoRepository equipos,
                                EquipoTorneoRepository inscripciones, JugadorEquipoRepository planteles,
                                PartidoRepository partidos) {
     }
@@ -158,6 +162,11 @@ public final class SeedService {
         Torneo liga = asegurarTorneo(DatosDePrueba.TORNEO_ARBITRO, EstadoTorneo.EN_CURSO,
                 BigDecimal.ZERO, LocalDate.now().minusDays(1));
 
+        // Spec 0024: no hay admins globales; admin01 administra los dos torneos de prueba.
+        UUID admin = cuentaDe(porAlias.get("admin01"));
+        asegurarRol(copa, admin, RolTorneo.ADMIN);
+        asegurarRol(liga, admin, RolTorneo.ADMIN);
+
         EstadoInscripcion[] estadosEnCopa = {
             EstadoInscripcion.APROBADO, EstadoInscripcion.APROBADO,
             EstadoInscripcion.PENDIENTE_PAGO, EstadoInscripcion.PENDIENTE_PAGO,
@@ -209,6 +218,22 @@ public final class SeedService {
                 .bancoDestino("Banco de Prueba")
                 .titularCuenta("CodeCup (datos de prueba)")
                 .build()));
+    }
+
+    private UUID cuentaDe(UsuarioPrueba u) {
+        return repos.cuentas().findByPersonaId(personaDe(u))
+                .orElseThrow(() -> new IllegalStateException("Falta la cuenta de " + u.alias()))
+                .getId();
+    }
+
+    private void asegurarRol(Torneo torneo, UUID cuentaId, RolTorneo rol) {
+        if (repos.torneoRoles().existsByTorneoIdAndCuentaIdAndRol(torneo.getId(), cuentaId, rol)) return;
+        repos.torneoRoles().save(TorneoRol.builder()
+                .torneo(torneo)
+                .cuentaId(cuentaId)
+                .rol(rol)
+                .creadoEn(LocalDateTime.now())
+                .build());
     }
 
     private EquipoTorneo asegurarInscripcion(Torneo torneo, Equipo equipo, UUID delegadoPersonaId,
