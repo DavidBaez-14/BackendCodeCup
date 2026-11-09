@@ -52,6 +52,11 @@ public class TorneoRol {
     @Column(nullable = false, length = 20)
     private RolTorneo rol;
 
+    /** Spec 0025, solo árbitros: opera todos los partidos del torneo sin que se los asignen uno a uno. */
+    @Builder.Default
+    @Column(name = "todos_los_partidos", nullable = false)
+    private Boolean todosLosPartidos = false;
+
     @Column(name = "creado_en", nullable = false)
     private LocalDateTime creadoEn;
 

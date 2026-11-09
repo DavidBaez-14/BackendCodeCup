@@ -60,6 +60,46 @@ public class Authz {
         return adminDeTorneo(permisos.torneoDeComprobante(comprobanteId));
     }
 
+    /**
+     * Spec 0025: opera ese partido (admin del torneo, árbitro asignado o árbitro con
+     * todos_los_partidos). 403 NO_ARBITRO_DEL_PARTIDO si no.
+     */
+    public boolean arbitroDePartido(UUID partidoId) {
+        UUID cuenta = cuentaActual();
+        if (!permisos.puedeArbitrar(partidoId, cuenta)) {
+            throw ApiException.forbidden("NO_ARBITRO_DEL_PARTIDO", "No tienes permisos para arbitrar este partido.");
+        }
+        return true;
+    }
+
+    /** Spec 0025: admin o árbitro del torneo. 403 NO_ARBITRO_DEL_TORNEO si no. */
+    public boolean staffDeTorneo(UUID torneoId) {
+        UUID cuenta = cuentaActual();
+        permisos.exigirTorneo(torneoId);
+        if (!permisos.esStaff(torneoId, cuenta)) {
+            throw noStaff();
+        }
+        return true;
+    }
+
+    public boolean staffDeInscripcion(UUID equipoTorneoId) {
+        cuentaActual();
+        return staffDeTorneo(permisos.torneoDeInscripcion(equipoTorneoId));
+    }
+
+    public boolean staffDeMulta(UUID multaId) {
+        cuentaActual();
+        return staffDeTorneo(permisos.torneoDeMulta(multaId));
+    }
+
+    /** Admin o árbitro de al menos un torneo. */
+    public boolean staffDeAlgunTorneo() {
+        if (permisos.torneosDondeEsStaff(cuentaActual()).isEmpty()) {
+            throw noStaff();
+        }
+        return true;
+    }
+
     /** Administra al menos un torneo (consultas que no son de un torneo concreto). */
     public boolean adminDeAlgunTorneo() {
         if (permisos.torneosQueAdministra(cuentaActual()).isEmpty()) {
@@ -75,6 +115,10 @@ public class Authz {
             throw new AuthenticationCredentialsNotFoundException("Sin sesión");
         }
         return JwtClaims.cuentaId(jwt);
+    }
+
+    static ApiException noStaff() {
+        return ApiException.forbidden("NO_ARBITRO_DEL_TORNEO", "No administras ni arbitras en este torneo.");
     }
 
     static ApiException noAdmin() {

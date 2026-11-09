@@ -55,6 +55,7 @@ public class TorneoAdminService {
     private final DirectorioPersonas directorioPersonas;
     private final RolesTorneoService rolesTorneoService;
     private final PermisosTorneo permisos;
+    private final terminus.co.edu.ufps.codecup.competicion.repository.PartidoArbitroRepository partidoArbitroRepo;
 
     /** Spec 0024: quien lo crea queda como su admin (sin rol global). */
     @Transactional
@@ -79,18 +80,14 @@ public class TorneoAdminService {
         return toDTO(torneo);
     }
 
-    /**
-     * Spec 0024: los torneos que la cuenta administra. Con {@code todosComoArbitroGlobal} (el rol
-     * ARBITRO global, que la 0025 reemplaza por árbitros por torneo) se ven todos, como antes.
-     */
+    /** Specs 0024 y 0025: los torneos donde la cuenta es admin o árbitro, los más nuevos primero. */
     @Transactional(readOnly = true)
-    public List<TorneoDTO> listarDeStaff(UUID cuentaId, boolean todosComoArbitroGlobal) {
-        var torneos = todosComoArbitroGlobal
-                ? torneoRepo.findAllByOrderByEdicionDesc()
-                : torneoRepo.findAllById(permisos.torneosQueAdministra(cuentaId)).stream()
-                        .sorted(java.util.Comparator.comparing(Torneo::getEdicion, java.util.Comparator.reverseOrder()))
-                        .toList();
-        return torneos.stream().map(this::toDTO).toList();
+    public List<TorneoDTO> listarDeStaff(UUID cuentaId) {
+        return torneoRepo.findAllById(permisos.torneosDondeEsStaff(cuentaId)).stream()
+                .sorted(java.util.Comparator.comparing(Torneo::getEdicion, java.util.Comparator.reverseOrder())
+                        .thenComparing(Torneo::getCreatedAt, java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())))
+                .map(this::toDTO)
+                .toList();
     }
 
     @Transactional
@@ -233,6 +230,10 @@ public class TorneoAdminService {
             var alineacion = partidoJugadorRepo.findByPartidoId(p.getId());
             if (!alineacion.isEmpty()) partidoJugadorRepo.deleteAll(alineacion);
         }
+
+        // 1b) Spec 0025: las asignaciones de árbitros de esos partidos.
+        var asignaciones = partidoArbitroRepo.findByPartidoIdIn(partidos.stream().map(Partido::getId).toList());
+        if (!asignaciones.isEmpty()) partidoArbitroRepo.deleteAll(asignaciones);
 
         // 2) Romper auto-referencias del bracket antes de borrar (siguiente_partido_id).
         for (Partido p : partidos) {

@@ -144,6 +144,25 @@ public abstract class AuthTestSupport {
         darRolDeTorneo(u, torneoId, terminus.co.edu.ufps.codecup.competicion.model.RolTorneo.ADMIN);
     }
 
+    @Autowired
+    protected terminus.co.edu.ufps.codecup.competicion.repository.PartidoArbitroRepository soportePartidoArbitros;
+
+    /** Spec 0025: árbitro del torneo, con o sin el permiso de todos los partidos. */
+    protected void hacerArbitro(Usuario u, UUID torneoId, boolean todosLosPartidos) {
+        var rol = darRolDeTorneo(u, torneoId, terminus.co.edu.ufps.codecup.competicion.model.RolTorneo.ARBITRO);
+        rol.setTodosLosPartidos(todosLosPartidos);
+        soporteRolesTorneo.save(rol);
+    }
+
+    /** Spec 0025: asigna la cuenta al partido (directo en la BD). */
+    protected void asignarArbitro(Usuario u, terminus.co.edu.ufps.codecup.competicion.model.Partido partido) {
+        soportePartidoArbitros.save(terminus.co.edu.ufps.codecup.competicion.model.PartidoArbitro.builder()
+                .partido(partido)
+                .cuentaId(cuentaIdDe(u))
+                .asignadoEn(LocalDateTime.now())
+                .build());
+    }
+
     protected terminus.co.edu.ufps.codecup.competicion.model.TorneoRol darRolDeTorneo(
             Usuario u, UUID torneoId, terminus.co.edu.ufps.codecup.competicion.model.RolTorneo rol) {
         return soporteRolesTorneo.save(terminus.co.edu.ufps.codecup.competicion.model.TorneoRol.builder()

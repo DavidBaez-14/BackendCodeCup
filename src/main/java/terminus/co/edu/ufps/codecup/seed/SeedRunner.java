@@ -41,6 +41,7 @@ public class SeedRunner implements ApplicationRunner {
     private final EquipoTorneoRepository inscripciones;
     private final JugadorEquipoRepository planteles;
     private final PartidoRepository partidos;
+    private final terminus.co.edu.ufps.codecup.competicion.repository.PartidoArbitroRepository partidoArbitros;
     private final CuentasDeSupabase supabase;
     private final PlatformTransactionManager transacciones;
     private final ConfigurableApplicationContext contexto;
@@ -52,7 +53,7 @@ public class SeedRunner implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         var repos = new SeedService.Repositorios(personas, cuentas, roles, perfiles, torneos, torneoRoles, equipos,
-                inscripciones, planteles, partidos);
+                inscripciones, planteles, partidos, partidoArbitros);
         var resumen = new SeedService(repos, supabase, contrasena, new TransactionTemplate(transacciones)).sembrar();
         log.info("[SEED] Listo: {} usuarios @prueba.local, {} torneos, {} inscripciones, {} miembros de plantel, {} partido(s).",
                 resumen.usuarios(), resumen.torneos(), resumen.inscripciones(), resumen.miembrosDePlantel(), resumen.partidos());

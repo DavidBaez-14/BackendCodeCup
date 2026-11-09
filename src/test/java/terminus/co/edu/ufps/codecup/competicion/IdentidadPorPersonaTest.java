@@ -79,8 +79,11 @@ class IdentidadPorPersonaTest extends AuthTestSupport {
                 .fecha(LocalDateTime.now())
                 .estado(EstadoPartido.PROGRAMADO)
                 .build());
-        Usuario arbitro = cuentaConRoles(Rol.ARBITRO);
+        Usuario arbitro = cuentaConRoles(Rol.JUGADOR);
         UUID cuentaArbitro = cuentaRepository.findConPersona(Cuenta.PROVEEDOR_SUPABASE, arbitro.sub()).orElseThrow().getId();
+        // Spec 0025: árbitro del torneo, asignado a este partido.
+        hacerArbitro(arbitro, torneo.getId(), false);
+        asignarArbitro(arbitro, partido);
 
         // Alineación por persona: entra, sale y vuelve a entrar.
         var alineacion = Map.of("personaId", beto, "equipoTorneoId", a.inscripcion().getId());

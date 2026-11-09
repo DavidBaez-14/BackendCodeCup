@@ -23,7 +23,9 @@ import terminus.co.edu.ufps.codecup.competicion.model.FormatoTorneo;
 import terminus.co.edu.ufps.codecup.competicion.model.PerfilDeportivo;
 import terminus.co.edu.ufps.codecup.competicion.model.JugadorEquipo;
 import terminus.co.edu.ufps.codecup.competicion.model.Partido;
+import terminus.co.edu.ufps.codecup.competicion.model.PartidoArbitro;
 import terminus.co.edu.ufps.codecup.competicion.model.RolTorneo;
+import terminus.co.edu.ufps.codecup.competicion.repository.PartidoArbitroRepository;
 import terminus.co.edu.ufps.codecup.competicion.model.Torneo;
 import terminus.co.edu.ufps.codecup.competicion.model.TorneoRol;
 import terminus.co.edu.ufps.codecup.competicion.repository.TorneoRolRepository;
@@ -60,7 +62,7 @@ public final class SeedService {
                                PerfilDeportivoRepository perfiles, TorneoRepository torneos,
                                TorneoRolRepository torneoRoles, EquipoRepository equipos,
                                EquipoTorneoRepository inscripciones, JugadorEquipoRepository planteles,
-                               PartidoRepository partidos) {
+                               PartidoRepository partidos, PartidoArbitroRepository partidoArbitros) {
     }
 
     public record Resumen(int usuarios, int torneos, int inscripciones, int miembrosDePlantel, int partidos) {
@@ -193,7 +195,8 @@ public final class SeedService {
                 enLiga.add(enLaLiga);
             }
         }
-        asegurarPartido(liga, enLiga.get(0), enLiga.get(1));
+        Partido programado = asegurarPartido(liga, enLiga.get(0), enLiga.get(1));
+        asegurarArbitros(liga, programado, porAlias);
         int partidos = repos.partidos().findByTorneoId(liga.getId()).size();
 
         return new Resumen(usuarios.size(), 2, equipos.size() + enLiga.size(), miembros, partidos);
@@ -226,14 +229,14 @@ public final class SeedService {
                 .getId();
     }
 
-    private void asegurarRol(Torneo torneo, UUID cuentaId, RolTorneo rol) {
-        if (repos.torneoRoles().existsByTorneoIdAndCuentaIdAndRol(torneo.getId(), cuentaId, rol)) return;
-        repos.torneoRoles().save(TorneoRol.builder()
-                .torneo(torneo)
-                .cuentaId(cuentaId)
-                .rol(rol)
-                .creadoEn(LocalDateTime.now())
-                .build());
+    private TorneoRol asegurarRol(Torneo torneo, UUID cuentaId, RolTorneo rol) {
+        return repos.torneoRoles().findByTorneoIdAndCuentaIdAndRol(torneo.getId(), cuentaId, rol)
+                .orElseGet(() -> repos.torneoRoles().save(TorneoRol.builder()
+                        .torneo(torneo)
+                        .cuentaId(cuentaId)
+                        .rol(rol)
+                        .creadoEn(LocalDateTime.now())
+                        .build()));
     }
 
     private EquipoTorneo asegurarInscripcion(Torneo torneo, Equipo equipo, UUID delegadoPersonaId,
@@ -282,26 +285,50 @@ public final class SeedService {
      * Garantiza un partido PROGRAMADO entre los dos equipos de la liga. Si el árbitro ya cerró
      * el anterior, crea el de la jornada siguiente; si hay uno programado, no hace nada.
      */
-    private void asegurarPartido(Torneo liga, EquipoTorneo local, EquipoTorneo visitante) {
+    private Partido asegurarPartido(Torneo liga, EquipoTorneo local, EquipoTorneo visitante) {
         List<Partido> entreEllos = repos.partidos().findByTorneoId(liga.getId()).stream()
                 .filter(p -> p.getEquipoLocalTorneo() != null && p.getEquipoVisitanteTorneo() != null
                         && local.getId().equals(p.getEquipoLocalTorneo().getId())
                         && visitante.getId().equals(p.getEquipoVisitanteTorneo().getId()))
                 .toList();
-        if (entreEllos.stream().anyMatch(p -> p.getEstado() == EstadoPartido.PROGRAMADO)) return;
+        var programado = entreEllos.stream().filter(p -> p.getEstado() == EstadoPartido.PROGRAMADO).findFirst();
+        if (programado.isPresent()) return programado.get();
         int jornada = entreEllos.stream()
                 .map(Partido::getJornada)
                 .filter(j -> j != null)
                 .max(Integer::compare)
                 .orElse(0) + 1;
-        repos.partidos().save(Partido.builder()
+        return repos.partidos().save(Partido.builder()
                 .torneo(liga)
                 .equipoLocalTorneo(local)
                 .equipoVisitanteTorneo(visitante)
                 .fecha(LocalDate.now().plusDays(1).atTime(LocalTime.of(16, 0)))
+                .lugar("Cancha 1 (datos de prueba)")
                 .estado(EstadoPartido.PROGRAMADO)
                 .fase(FaseTorneo.GRUPOS)
                 .jornada(jornada)
                 .build());
+    }
+
+    /**
+     * Spec 0025: arbitro01 queda asignado al partido programado de la liga y arbitro02 arbitra todos
+     * sus partidos con el permiso total. Así se prueban las dos formas de arbitrar.
+     */
+    private void asegurarArbitros(Torneo liga, Partido programado, Map<String, UsuarioPrueba> porAlias) {
+        UUID arbitro01 = cuentaDe(porAlias.get("arbitro01"));
+        UUID arbitro02 = cuentaDe(porAlias.get("arbitro02"));
+        asegurarRol(liga, arbitro01, RolTorneo.ARBITRO);
+        var rol02 = asegurarRol(liga, arbitro02, RolTorneo.ARBITRO);
+        if (!Boolean.TRUE.equals(rol02.getTodosLosPartidos())) {
+            rol02.setTodosLosPartidos(true);
+            repos.torneoRoles().save(rol02);
+        }
+        if (!repos.partidoArbitros().existsByPartidoIdAndCuentaId(programado.getId(), arbitro01)) {
+            repos.partidoArbitros().save(PartidoArbitro.builder()
+                    .partido(programado)
+                    .cuentaId(arbitro01)
+                    .asignadoEn(LocalDateTime.now())
+                    .build());
+        }
     }
 }

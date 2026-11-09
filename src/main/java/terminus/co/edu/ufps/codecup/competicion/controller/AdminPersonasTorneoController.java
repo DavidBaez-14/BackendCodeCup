@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -48,6 +49,22 @@ public class AdminPersonasTorneoController {
                                           @AuthenticationPrincipal Jwt jwt) {
         rolesTorneoService.quitar(torneoId, rolId, JwtClaims.cuentaId(jwt));
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Spec 0025: da o quita a un árbitro del torneo el permiso de operar todos sus partidos.
+     * Cuerpo {@code {"todosLosPartidos": true}}. 404 NO_ES_ARBITRO_DEL_TORNEO.
+     */
+    @PutMapping("/arbitros/{cuentaId}/todos-los-partidos")
+    @PreAuthorize("@authz.adminDeTorneo(#torneoId)")
+    public ResponseEntity<RolTorneoDTO> todosLosPartidos(@PathVariable UUID torneoId, @PathVariable UUID cuentaId,
+                                                         @RequestBody java.util.Map<String, Boolean> req,
+                                                         @AuthenticationPrincipal Jwt jwt) {
+        Boolean valor = req.get("todosLosPartidos");
+        if (valor == null) {
+            throw terminus.co.edu.ufps.codecup.shared.error.ApiException.badRequest("VALIDACION", "Indica todosLosPartidos (true o false).");
+        }
+        return ResponseEntity.ok(rolesTorneoService.cambiarTodosLosPartidos(torneoId, cuentaId, valor, JwtClaims.cuentaId(jwt)));
     }
 
     /** Invita a un co-admin o árbitro. Devuelve el enlace para compartir. */

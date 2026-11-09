@@ -50,6 +50,7 @@ class SeedServiceTest {
     @Autowired EquipoTorneoRepository inscripciones;
     @Autowired JugadorEquipoRepository planteles;
     @Autowired PartidoRepository partidos;
+    @Autowired terminus.co.edu.ufps.codecup.competicion.repository.PartidoArbitroRepository partidoArbitros;
     @Autowired PlatformTransactionManager transacciones;
 
     /** Admin API simulada: un id estable por correo y el registro de cuántas veces se pidió cada uno. */
@@ -61,7 +62,7 @@ class SeedServiceTest {
 
     private SeedService seed(String contrasena) {
         var repos = new SeedService.Repositorios(personas, cuentas, roles, perfiles, torneos, torneoRoles, equipos,
-                inscripciones, planteles, partidos);
+                inscripciones, planteles, partidos, partidoArbitros);
         return new SeedService(repos, supabaseSimulado, contrasena, new TransactionTemplate(transacciones));
     }
 
@@ -92,6 +93,16 @@ class SeedServiceTest {
         UUID admin01 = cuentas.findByPersonaId(persona("9000000001")).orElseThrow().getId();
         assertThat(torneoRoles.torneosDe(admin01, terminus.co.edu.ufps.codecup.competicion.model.RolTorneo.ADMIN))
                 .containsExactlyInAnyOrder(copa.getId(), liga.getId());
+
+        // Spec 0025: arbitro01 asignado al partido programado; arbitro02 con todos los partidos de la liga.
+        UUID arbitro01 = cuentas.findByPersonaId(persona("9000000101")).orElseThrow().getId();
+        UUID arbitro02 = cuentas.findByPersonaId(persona("9000000102")).orElseThrow().getId();
+        var programado = partidos.findByTorneoId(liga.getId()).stream()
+                .filter(p -> p.getEstado() == EstadoPartido.PROGRAMADO).findFirst().orElseThrow();
+        assertThat(partidoArbitros.existsByPartidoIdAndCuentaId(programado.getId(), arbitro01)).isTrue();
+        assertThat(programado.getLugar()).isNotBlank();
+        assertThat(torneoRoles.findByTorneoIdAndCuentaIdAndRol(liga.getId(), arbitro02,
+                terminus.co.edu.ufps.codecup.competicion.model.RolTorneo.ARBITRO).orElseThrow().getTodosLosPartidos()).isTrue();
         assertThat(partidos.findByTorneoId(liga.getId()))
                 .filteredOn(p -> p.getEstado() == EstadoPartido.PROGRAMADO)
                 .hasSize(1);

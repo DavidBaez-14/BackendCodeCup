@@ -63,4 +63,8 @@ public class Partido {
 
     @Column(name = "tipo_cierre", length = 30)
     private String tipoCierre;
+
+    /** Spec 0025: dónde se juega (por ejemplo "Cancha 2"). Lo programa el admin; opcional. */
+    @Column(name = "lugar", length = 120)
+    private String lugar;
 }

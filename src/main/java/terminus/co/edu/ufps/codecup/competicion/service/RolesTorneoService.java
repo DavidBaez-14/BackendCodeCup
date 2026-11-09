@@ -37,6 +37,7 @@ public class RolesTorneoService {
     private final TorneoRolRepository rolRepo;
     private final DirectorioPersonas directorioPersonas;
     private final Invitaciones invitaciones;
+    private final terminus.co.edu.ufps.codecup.competicion.repository.PartidoArbitroRepository partidoArbitroRepo;
 
     /** Quien crea el torneo queda como su admin. */
     @Transactional
@@ -58,6 +59,7 @@ public class RolesTorneoService {
                     .nombre(c != null ? c.nombre() : null)
                     .correo(c != null ? c.correo() : null)
                     .rol(r.getRol().name())
+                    .todosLosPartidos(r.getRol() == RolTorneo.ARBITRO ? Boolean.TRUE.equals(r.getTodosLosPartidos()) : null)
                     .creadoEn(r.getCreadoEn())
                     .esTuyo(r.getCuentaId().equals(quienConsulta))
                     .build();
@@ -91,8 +93,23 @@ public class RolesTorneoService {
                     "Es el último administrador del torneo. Invita a otro antes de quitarlo.");
         }
         rolRepo.delete(rol);
+        if (rol.getRol() == RolTorneo.ARBITRO) {
+            // Spec 0025: sin el rol tampoco opera los partidos que tenía asignados en este torneo.
+            partidoArbitroRepo.borrarDeCuentaEnTorneo(rol.getCuentaId(), torneoId);
+        }
         log.info("[AUDIT][ROL_TORNEO_QUITADO] torneo={} cuenta={} rol={} por={}",
                 torneoId, rol.getCuentaId(), rol.getRol(), quienQuita);
+    }
+
+    /** Spec 0025: da o quita a un árbitro del torneo el permiso de operar todos sus partidos. */
+    @Transactional
+    public RolTorneoDTO cambiarTodosLosPartidos(UUID torneoId, UUID cuentaArbitro, boolean valor, UUID quien) {
+        var rol = rolRepo.findByTorneoIdAndCuentaIdAndRol(torneoId, cuentaArbitro, RolTorneo.ARBITRO)
+                .orElseThrow(() -> ApiException.notFound("NO_ES_ARBITRO_DEL_TORNEO", "Esa cuenta no es árbitro de este torneo."));
+        rol.setTodosLosPartidos(valor);
+        rolRepo.save(rol);
+        log.info("[AUDIT][ARBITRO_TODOS_LOS_PARTIDOS] torneo={} arbitro={} valor={} por={}", torneoId, cuentaArbitro, valor, quien);
+        return listar(torneoId, quien).stream().filter(r -> r.getId().equals(rol.getId())).findFirst().orElseThrow();
     }
 
     /**
@@ -129,11 +146,14 @@ public class RolesTorneoService {
     private static Rol aRolDeInvitacion(RolTorneo rol) {
         return switch (rol) {
             case ADMIN -> Rol.ADMINISTRADOR;
+            case ARBITRO -> Rol.ARBITRO;
         };
     }
 
+    /** Spec 0025: el árbitro invitado entra sin permiso total; el admin se lo da si quiere. */
     private static RolTorneo aRolDeTorneo(Rol rol) {
         if (rol == Rol.ADMINISTRADOR) return RolTorneo.ADMIN;
+        if (rol == Rol.ARBITRO) return RolTorneo.ARBITRO;
         throw ApiException.badRequest("ROL_NO_INVITABLE", "Esta invitación no tiene un rol válido para un torneo.");
     }
 }

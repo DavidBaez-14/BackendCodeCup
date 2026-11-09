@@ -30,6 +30,7 @@ public class PartidoAdminService {
     private final FixtureService fixtureService;
     private final BracketAutoFillService bracketAutoFillService;
     private final terminus.co.edu.ufps.codecup.finanzas.service.MultaService multaService;
+    private final terminus.co.edu.ufps.codecup.competicion.repository.PartidoArbitroRepository partidoArbitroRepo;
 
     @Transactional(readOnly = true)
     public List<PartidoAdminDTO> listarPorTorneo(UUID torneoId) {
@@ -447,7 +448,21 @@ public class PartidoAdminService {
                 .jornada(p.getJornada())
                 .grupo(p.getGrupo())
                 .torneoId(p.getTorneo() != null ? p.getTorneo().getId() : null)
+                .lugar(p.getLugar())
+                .arbitros(arbitrosDe(p))
                 .build();
+    }
+
+    private java.util.List<terminus.co.edu.ufps.codecup.competicion.dto.arbitro.ArbitroAsignadoDTO> arbitrosDe(Partido p) {
+        if (p.getId() == null) return java.util.List.of();
+        var asignados = partidoArbitroRepo.findByPartidoIdOrderByAsignadoEnAsc(p.getId());
+        if (asignados.isEmpty()) return java.util.List.of();
+        var nombres = directorioPersonas.nombresDeCuentas(asignados.stream()
+                .map(terminus.co.edu.ufps.codecup.competicion.model.PartidoArbitro::getCuentaId).toList());
+        return asignados.stream()
+                .map(pa -> new terminus.co.edu.ufps.codecup.competicion.dto.arbitro.ArbitroAsignadoDTO(
+                        pa.getCuentaId(), nombres.get(pa.getCuentaId()), pa.getAsignadoEn()))
+                .toList();
     }
 
     private EventoDTO toEventoDTO(EventoPartido e) {

@@ -14,7 +14,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/supercopa/admin/partidos")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ARBITRO') or @authz.adminDePartido(#partidoId)")
+@PreAuthorize("@authz.arbitroDePartido(#partidoId)")
 public class AdminPartidoController {
 
     private final PartidoAdminService partidoAdminService;

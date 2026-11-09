@@ -24,4 +24,8 @@ public class PartidoAdminDTO {
     private Integer jornada;
     private String grupo;
     private UUID torneoId;
+    /** Spec 0025: dónde se juega. */
+    private String lugar;
+    /** Spec 0025: árbitros asignados a este partido. */
+    private java.util.List<terminus.co.edu.ufps.codecup.competicion.dto.arbitro.ArbitroAsignadoDTO> arbitros;
 }

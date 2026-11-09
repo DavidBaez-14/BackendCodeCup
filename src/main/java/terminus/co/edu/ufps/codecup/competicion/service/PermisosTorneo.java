@@ -33,6 +33,7 @@ public class PermisosTorneo {
     private final PartidoRepository partidoRepo;
     private final MultaRepository multaRepo;
     private final ComprobanteRepository comprobanteRepo;
+    private final terminus.co.edu.ufps.codecup.competicion.repository.PartidoArbitroRepository partidoArbitroRepo;
 
     @Transactional(readOnly = true)
     public boolean esAdmin(UUID torneoId, UUID cuentaId) {
@@ -43,6 +44,42 @@ public class PermisosTorneo {
     @Transactional(readOnly = true)
     public List<UUID> torneosQueAdministra(UUID cuentaId) {
         return rolRepo.torneosDe(cuentaId, RolTorneo.ADMIN);
+    }
+
+    /** Spec 0025: tiene el rol de árbitro en ese torneo (con o sin permiso total). */
+    @Transactional(readOnly = true)
+    public boolean esArbitroDelTorneo(UUID torneoId, UUID cuentaId) {
+        return torneoId != null && cuentaId != null
+                && rolRepo.existsByTorneoIdAndCuentaIdAndRol(torneoId, cuentaId, RolTorneo.ARBITRO);
+    }
+
+    /** Admin o árbitro del torneo: ve sus partidos, su clasificación y sus multas. */
+    @Transactional(readOnly = true)
+    public boolean esStaff(UUID torneoId, UUID cuentaId) {
+        return esAdmin(torneoId, cuentaId) || esArbitroDelTorneo(torneoId, cuentaId);
+    }
+
+    /** Torneos donde la cuenta es admin o árbitro, sin repetir. */
+    @Transactional(readOnly = true)
+    public List<UUID> torneosDondeEsStaff(UUID cuentaId) {
+        var ids = new java.util.LinkedHashSet<>(rolRepo.torneosDe(cuentaId, RolTorneo.ADMIN));
+        ids.addAll(rolRepo.torneosDe(cuentaId, RolTorneo.ARBITRO));
+        return List.copyOf(ids);
+    }
+
+    /**
+     * Spec 0025: quién opera un partido (planilla, alineación, eventos, cerrar, W.O. y cancelar):
+     * un admin del torneo, un árbitro asignado a ese partido o un árbitro del torneo con
+     * {@code todos_los_partidos}.
+     */
+    @Transactional(readOnly = true)
+    public boolean puedeArbitrar(UUID partidoId, UUID cuentaId) {
+        UUID torneoId = torneoDePartido(partidoId);
+        if (esAdmin(torneoId, cuentaId)) return true;
+        if (partidoArbitroRepo.existsByPartidoIdAndCuentaId(partidoId, cuentaId)) return true;
+        return rolRepo.findByTorneoIdAndCuentaIdAndRol(torneoId, cuentaId, RolTorneo.ARBITRO)
+                .map(r -> Boolean.TRUE.equals(r.getTodosLosPartidos()))
+                .orElse(false);
     }
 
     /** 404 si el torneo no existe. */

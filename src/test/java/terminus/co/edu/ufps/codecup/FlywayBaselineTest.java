@@ -90,6 +90,7 @@ class FlywayBaselineTest {
                   ('%4$s', 'SUPABASE', 'sub-admin', 'admin@prueba.local', '%2$s', 'ACTIVA', now());
                 insert into identidad.cuenta_roles (cuenta_id, rol, estado, fecha_solicitud) values
                   ('%4$s', 'ADMINISTRADOR', 'APROBADO', now()),
+                  ('%4$s', 'ARBITRO', 'APROBADO', now()),
                   ('%4$s', 'JUGADOR', 'APROBADO', now()),
                   ('%3$s', 'JUGADOR', 'APROBADO', now());
                 insert into competicion.jugadores (cedula, nombre, correo, altura_cm, posicion, created_at) values
@@ -152,7 +153,7 @@ class FlywayBaselineTest {
         var versiones = jdbc.queryForList(
                 "select version from identidad.flyway_schema_history where success and version is not null order by installed_rank",
                 String.class);
-        assertThat(versiones).containsExactly("1", "2", "3", "4", "5", "6", "7");
+        assertThat(versiones).containsExactly("1", "2", "3", "4", "5", "6", "7", "8");
 
         var schemas = jdbc.queryForList(
                 "select schema_name from information_schema.schemata where schema_name in ('identidad','competicion','finanzas','analytics')",
@@ -190,6 +191,20 @@ class FlywayBaselineTest {
         assertThat(jdbc.queryForObject(
                 "select count(*) from identidad.cuenta_roles where rol = 'SUPERADMIN' and cuenta_id = ?",
                 Integer.class, C_DELEGADA)).isZero();
+    }
+
+    /** Spec 0025, Q1 (a): el ARBITRO global arbitra todos los partidos de los torneos que ya existían. */
+    @Test
+    void v8_elArbitroGlobalQuedaConTodosLosPartidosDeLosTorneosExistentes() {
+        var filas = jdbc.queryForList(
+                "select torneo_id, todos_los_partidos from competicion.torneo_roles where cuenta_id = ? and rol = 'ARBITRO'",
+                C_ADMIN);
+        assertThat(filas).hasSize(2);
+        assertThat(filas).allSatisfy(f -> assertThat(f.get("todos_los_partidos")).isEqualTo(true));
+        assertThat(filas.stream().map(f -> f.get("torneo_id")).toList()).containsExactlyInAnyOrder(TORNEO, TORNEO_2);
+        // Los ADMIN de la V7 quedan con el permiso en false (no aplica a ellos).
+        assertThat(jdbc.queryForObject(
+                "select count(*) from competicion.torneo_roles where rol = 'ADMIN' and todos_los_partidos", Integer.class)).isZero();
     }
 
     /** Spec 0024: una invitación a la plataforma sigue necesitando correo; una con ámbito, no. */

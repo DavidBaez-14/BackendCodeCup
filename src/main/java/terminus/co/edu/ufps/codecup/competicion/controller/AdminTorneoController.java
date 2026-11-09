@@ -37,16 +37,11 @@ public class AdminTorneoController {
         return ResponseEntity.ok(torneoAdminService.crear(req, JwtClaims.cuentaId(jwt)));
     }
 
-    /**
-     * Spec 0024: los torneos donde quien llama es admin. Un ARBITRO global (rol anterior a la
-     * 0025) sigue viéndolos todos, como antes.
-     */
+    /** Specs 0024 y 0025: los torneos donde quien llama es admin o árbitro. */
     @GetMapping
     @PreAuthorize("@authz.registrado()")
-    public ResponseEntity<List<TorneoDTO>> listar(@AuthenticationPrincipal Jwt jwt,
-                                                  org.springframework.security.core.Authentication auth) {
-        boolean arbitroGlobal = auth.getAuthorities().stream().anyMatch(a -> "ROLE_ARBITRO".equals(a.getAuthority()));
-        return ResponseEntity.ok(torneoAdminService.listarDeStaff(JwtClaims.cuentaId(jwt), arbitroGlobal));
+    public ResponseEntity<List<TorneoDTO>> listar(@AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(torneoAdminService.listarDeStaff(JwtClaims.cuentaId(jwt)));
     }
 
     @PostMapping("/{torneoId}/publicar")
@@ -233,13 +228,13 @@ public class AdminTorneoController {
     }
 
     @GetMapping("/{torneoId}/partidos")
-    @PreAuthorize("hasRole('ARBITRO') or @authz.adminDeTorneo(#torneoId)")
+    @PreAuthorize("@authz.staffDeTorneo(#torneoId)")
     public ResponseEntity<List<PartidoAdminDTO>> partidos(@PathVariable UUID torneoId) {
         return ResponseEntity.ok(partidoAdminService.listarPorTorneo(torneoId));
     }
 
     @GetMapping("/{torneoId}/clasificacion")
-    @PreAuthorize("hasRole('ARBITRO') or @authz.adminDeTorneo(#torneoId)")
+    @PreAuthorize("@authz.staffDeTorneo(#torneoId)")
     public ResponseEntity<Map<String, List<PosicionGrupoDTO>>> clasificacion(@PathVariable UUID torneoId) {
         return ResponseEntity.ok(clasificacionService.calcularPorGrupo(torneoId));
     }

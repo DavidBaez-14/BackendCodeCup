@@ -140,12 +140,12 @@ class AuthFlowSecurityTest extends AuthTestSupport {
         mvc.perform(get("/api/admin/roles/pendientes").header("Authorization", u.bearer()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESO_DENEGADO"));
-        // Endpoint de árbitro heredado de supercopa: antes respondía 400. Desde la 0024 dice por qué.
+        // Endpoint de árbitro heredado de supercopa: antes respondía 400. Desde la 0025 dice por qué.
         var partido = partidoDePrueba(torneoDePrueba(terminus.co.edu.ufps.codecup.competicion.model.EstadoTorneo.EN_CURSO));
         mvc.perform(get("/api/supercopa/admin/partidos/{id}/eventos", partido.getId())
                         .header("Authorization", u.bearer()))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("NO_ADMIN_DEL_TORNEO"));
+                .andExpect(jsonPath("$.code").value("NO_ARBITRO_DEL_PARTIDO"));
     }
 
     @Test
