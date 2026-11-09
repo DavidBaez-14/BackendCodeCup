@@ -72,9 +72,23 @@ Se hace una sola vez. Flyway y el seed hacen casi todo.
    - **`DB_PASSWORD`:** la que se puso al crear el proyecto. Si se perdió, en Project Settings → Database → Reset database password.
    - **`SUPABASE_PUBLISHABLE_KEY`** y la clave `render`: en Project Settings → API Keys.
 
-**Limitaciones de `DesafioSportsDev`:**
-- **"Entrar con Google" no funciona** mientras no se configure el proveedor de Google en este proyecto. Se entra con correo y contraseña.
-- **Los correos de recuperación casi no salen.** El servidor de correo por defecto de Supabase solo entrega a miembros de la organización y con un límite bajo por hora. Para probar, mejor las cuentas del seed.
+**Limitación de `DesafioSportsDev`:** los correos de recuperación casi no salen. El servidor de correo por defecto de Supabase solo entrega a miembros de la organización y con un límite bajo por hora. Para probar, mejor las cuentas del seed o "Entrar con Google".
+
+### Activar "Entrar con Google" (opcional, lo hace David)
+
+Sin esto, el botón de Google de la web falla y el equipo entra con correo y contraseña. Toma unos 5 minutos si Google ya funciona en #1, porque se reutiliza el mismo proyecto de Google Cloud.
+
+1. **Copiar el callback de Supabase.** En `DesafioSportsDev` → Authentication → Sign In / Providers → Google, copia el **Callback URL**: `https://pugmmpdqmhrlrkyxxcty.supabase.co/auth/v1/callback`.
+2. **Crear un cliente OAuth aparte en Google Cloud.** En el mismo proyecto que usa #1: APIs & Services → Credentials → Create credentials → OAuth client ID. En la consola nueva es Google Auth Platform → Clients → Create client.
+   - Application type: **Web application**. Nombre: `DesafioSportsDev`.
+   - **Authorized redirect URIs:** el callback del paso 1.
+   - Un cliente aparte no toca el de producción y se puede borrar al terminar.
+3. **Pegar las credenciales en Supabase.** De vuelta en el proveedor Google de `DesafioSportsDev`: activarlo, pegar el **Client ID** y el **Client Secret** del cliente nuevo y guardar.
+4. **Probar** desde `http://localhost:5173` con "Entrar con Google".
+
+**Si Google dice "Acceso bloqueado" o que la app está en pruebas:** la pantalla de consentimiento está en modo *Testing* y solo deja entrar a los correos de la lista de usuarios de prueba. Hay dos salidas:
+- Agregar los correos del equipo en Google Auth Platform → Audience → Test users (antes, OAuth consent screen → Test users).
+- Publicar la app.
 
 **Lo haces tú:**
 1. **Crear el servicio en Render** con esos valores (secciones 4 y 5). En el primer arranque, Flyway crea los schemas `identidad`, `competicion`, `finanzas` y `analytics`, y aplica todas las migraciones.
