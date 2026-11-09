@@ -26,7 +26,7 @@ David es el dueño del repo y de Supabase y te pasa lo que necesites. **El equip
 | Panel de Render (variables y logs) | Si lo pide | Sí, es el dueño del servicio | **No.** Las variables tienen secretos y los logs, motivos de bloqueos y sanciones. |
 | Panel de Supabase | Dueño | No hace falta | No |
 | `DB_PASSWORD`, `SUPABASE_SECRET_KEY` | Sí | Sí | **Nunca** |
-| `SEED_PASSWORD` | Sí | Sí | Solo si el servicio apunta al proyecto de desarrollo (sección 2) |
+| `SEED_PASSWORD` | Sí | Sí | Solo la de `DesafioSportsDev`, si David quiere (sección 2) |
 | URL del backend y Swagger | Sí | Sí | Sí. Son públicos. |
 | URL de Supabase y publishable key | Sí | Sí | Sí. Son públicas: ya van dentro del JavaScript de la web. |
 
@@ -34,24 +34,29 @@ David es el dueño del repo y de Supabase y te pasa lo que necesites. **El equip
 
 ---
 
-## 2. A qué Supabase apunta el servicio (lo decide David)
+## 2. A qué Supabase apunta el servicio
 
-**Supabase #1 es producción:** tiene personas reales con documento, correo y su historial. Como el equipo de la interfaz no es de confianza total, lo recomendado es que este servicio apunte a un **proyecto aparte, "CodeCup dev"**, con datos de prueba.
+**Este servicio apunta a `DesafioSportsDev`** (ref `pugmmpdqmhrlrkyxxcty`), un proyecto de desarrollo con datos de prueba. Si alguien rompe algo, se vuelve a correr el seed.
 
-| | Proyecto "CodeCup dev" (recomendado) | Supabase #1 (producción) |
-|---|---|---|
-| Qué ve el equipo de la interfaz | Datos ficticios del seed | Datos reales |
-| Cuentas para probar | Las del seed, si David comparte `SEED_PASSWORD` | Cada uno registra la suya y David le da solo los roles que necesita. **Nunca ADMINISTRADOR.** |
-| Si alguien rompe algo | Se vuelve a correr el seed | Hay que restaurar un respaldo |
+**Supabase #1 es producción y este servicio no lo toca.** Tiene personas reales con documento, correo y su historial, y el equipo de la interfaz no es de confianza total.
 
-**Si se usa #1, `SEED_PASSWORD` no se comparte jamás.** Es la misma contraseña para los 30 usuarios del seed, así que la de `jugador01` también abre `admin01`.
+**La contraseña de la base y la clave secreta de `DesafioSportsDev` tampoco van al equipo de la interfaz.**
+- **No las necesitan:** la web solo habla con Supabase Auth (URL y publishable key) y con este backend.
+- **Con la contraseña podrían romper el entorno de todos:** borrar schemas o tocar el historial de Flyway, y el backend de Render dejaría de arrancar.
+- **Con la clave secreta podrían crear o borrar usuarios** y saltarse cualquier permiso de Storage.
 
-### Preparar "CodeCup dev"
+**`SEED_PASSWORD` nunca se usa sobre #1.** Es la misma para los 30 usuarios del seed, así que la de `jugador01` también abre `admin01`. En `DesafioSportsDev` los datos son ficticios y David decide si la comparte.
+
+### Preparar `DesafioSportsDev`
 
 Se hace una sola vez. Flyway y el seed hacen casi todo.
 
+**Ya está hecho:**
+- El proyecto existe.
+- Su JWKS publica una clave **ES256**, la misma que espera el backend. No hay que cambiar código.
+
 **Lo hace David en Supabase:**
-1. **Crear el proyecto** en la región **East US (North Virginia)**, la misma de #1 y de Render. El plan gratis permite dos proyectos activos.
+1. **Comprobar la región.** En Connect → Session pooler, el host debe contener `us-east-1`. Si sale otra región, en Render se elige la más cercana a esa en vez de Virginia.
 2. **Correo sin confirmación.** En Authentication → Sign In / Providers → Email, apagar **Confirm email**. En desarrollo no hace falta mandar correos.
 3. **URLs permitidas.** En Authentication → URL Configuration, poner `http://localhost:5173` como Site URL y agregar `http://localhost:5173/**` a Redirect URLs.
 4. **Bucket de comprobantes.** En Storage → New bucket, crear `comprobantes-inscripcion` como **privado**. El backend no lo crea solo.
@@ -60,7 +65,7 @@ Se hace una sola vez. Flyway y el seed hacen casi todo.
 
 **Lo haces tú:**
 1. **Crear el servicio en Render** con esos valores (secciones 4 y 5). En el primer arranque, Flyway crea los schemas `identidad`, `competicion`, `finanzas` y `analytics`, y aplica todas las migraciones.
-2. **Correr el seed una vez desde tu máquina**, no desde Render. Usa un `.env` que apunte a "CodeCup dev" y que incluya `SUPABASE_SECRET_KEY` y `SEED_PASSWORD`:
+2. **Correr el seed una vez desde tu máquina**, no desde Render. Usa un `.env` que apunte a `DesafioSportsDev` y que incluya `SUPABASE_SECRET_KEY` y `SEED_PASSWORD`:
    ```bash
    .\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=seed"
    ```
@@ -100,14 +105,14 @@ En Render: **New → Web Service** y eliges `BackendCodeCup`.
 
 ## 5. Variables de entorno
 
-En Environment del servicio. Los valores salen del proyecto de Supabase que decidió David (sección 2).
+En Environment del servicio. Los valores salen de `DesafioSportsDev` (sección 2).
 
 | Variable | Valor | ¿Secreta? | Notas |
 |---|---|---|---|
 | `DB_URL` | `jdbc:postgresql://<host-del-pooler>:5432/postgres` | No | **Session pooler, puerto 5432.** No uses la conexión directa (`db.<ref>.supabase.co`, solo IPv6) ni el transaction pooler (6543), que no sirve para Hibernate ni Flyway. |
-| `DB_USERNAME` | `postgres.<ref-del-proyecto>` | No | |
+| `DB_USERNAME` | `postgres.pugmmpdqmhrlrkyxxcty` | No | |
 | `DB_PASSWORD` | La que te pasa David | **Sí** | |
-| `SUPABASE_URL` | `https://<ref-del-proyecto>.supabase.co` | No | **Debe ser el mismo proyecto que usa la web** (`VITE_SUPABASE_URL`). Si no, todo responde 401. |
+| `SUPABASE_URL` | `https://pugmmpdqmhrlrkyxxcty.supabase.co` | No | **Debe ser el mismo proyecto que usa la web** (`VITE_SUPABASE_URL`). Si no, todo responde 401. |
 | `SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_…` | No | Prellena el "Token de prueba" de Swagger. |
 | `SUPABASE_SECRET_KEY` | La clave `render` | **Sí** | Sin ella, subir y ver comprobantes falla. |
 | `FRONTEND_URLS` | `https://<web>,http://localhost:5173` | No | Ver abajo. |
@@ -157,7 +162,7 @@ En Environment del servicio. Los valores salen del proyecto de Supabase que deci
 Su `.env.local` de la web:
 
 ```bash
-VITE_SUPABASE_URL=https://<ref-del-proyecto>.supabase.co
+VITE_SUPABASE_URL=https://pugmmpdqmhrlrkyxxcty.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_…
 VITE_GATEWAY_URL=https://<nombre>.onrender.com
 ```
