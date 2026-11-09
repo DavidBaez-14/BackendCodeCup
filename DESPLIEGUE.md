@@ -18,15 +18,16 @@ Guía para quien despliega BackendCodeCup en Render con Docker. Explica qué se 
 
 ## 1. Quién tiene qué
 
-David es el dueño del repo y de Supabase y te pasa lo que necesites. **El equipo de la interfaz no tiene acceso a este repo ni a ningún secreto.** Si te piden algo, revisa esta tabla antes de compartirlo.
+David es el dueño del repo y de Supabase y te pasa lo que necesites. **El equipo de la interfaz no tiene acceso a este repo, a Render ni a nada de Supabase #1.** Al proyecto de prueba `DesafioSportsDev` sí puede entrar (sección 2). Si te piden algo, revisa esta tabla antes de compartirlo.
 
 | Recurso | David | Quien despliega | Equipo de la interfaz |
 |---|---|---|---|
 | Repo `BackendCodeCup` | Dueño | Colaborador con escritura | No |
-| Panel de Render (variables y logs) | Si lo pide | Sí, es el dueño del servicio | **No.** Las variables tienen secretos y los logs, motivos de bloqueos y sanciones. |
-| Panel de Supabase | Dueño | No hace falta | No |
-| `DB_PASSWORD`, `SUPABASE_SECRET_KEY` | Sí | Sí | **Nunca** |
-| `SEED_PASSWORD` | Sí | Sí | Solo la de `DesafioSportsDev`, si David quiere (sección 2) |
+| Panel de Render | Si lo pide | Sí, es el dueño del servicio | **No.** Desde ahí se borra o se reconfigura el servicio que usan todos. |
+| Supabase #1 (producción): panel, contraseña y claves | Dueño | No | **Nunca** |
+| Panel de `DesafioSportsDev` | Dueño | Si lo necesita | Sí, en una organización aparte de #1 (sección 2) |
+| Contraseña de la base de `DesafioSportsDev` | Sí | Sí | Si David quiere |
+| `SEED_PASSWORD` de `DesafioSportsDev` | Sí | Sí: la elige al correr el seed | Sí |
 | URL del backend y Swagger | Sí | Sí | Sí. Son públicos. |
 | URL de Supabase y publishable key | Sí | Sí | Sí. Son públicas: ya van dentro del JavaScript de la web. |
 
@@ -36,16 +37,19 @@ David es el dueño del repo y de Supabase y te pasa lo que necesites. **El equip
 
 ## 2. A qué Supabase apunta el servicio
 
-**Este servicio apunta a `DesafioSportsDev`** (ref `pugmmpdqmhrlrkyxxcty`), un proyecto de desarrollo con datos de prueba. Si alguien rompe algo, se vuelve a correr el seed.
+**Este servicio apunta a `DesafioSportsDev`** (ref `pugmmpdqmhrlrkyxxcty`), un proyecto de prueba donde el equipo de la interfaz trabaja con sus propios datos.
 
-**Supabase #1 es producción y este servicio no lo toca.** Tiene personas reales con documento, correo y su historial, y el equipo de la interfaz no es de confianza total.
+**Supabase #1 es producción y este servicio no lo toca.** Tiene personas reales con documento, correo y su historial.
 
-**La contraseña de la base y la clave secreta de `DesafioSportsDev` tampoco van al equipo de la interfaz.**
-- **No las necesitan:** la web solo habla con Supabase Auth (URL y publishable key) y con este backend.
-- **Con la contraseña podrían romper el entorno de todos:** borrar schemas o tocar el historial de Flyway, y el backend de Render dejaría de arrancar.
-- **Con la clave secreta podrían crear o borrar usuarios** y saltarse cualquier permiso de Storage.
+**El equipo de la interfaz puede entrar al panel de `DesafioSportsDev`, con tres condiciones:**
+1. **Que `DesafioSportsDev` esté en una organización de Supabase aparte de #1.**
+   - En el plan gratis, los permisos valen para toda la organización: invitar a alguien a la organización de #1 le da acceso a producción.
+   - Si están juntos, se mueve en Project Settings → General → Transfer project a una organización nueva.
+   - El equipo se invita solo a esa organización, con rol Developer.
+2. **Que ninguna contraseña se repita con #1:** ni la de la base ni `SEED_PASSWORD`. El seed usa una sola contraseña para sus 30 usuarios; si fuera la misma de #1, la de `jugador01` de prueba abriría `admin01` de producción.
+3. **Que el esquema solo lo cambie el backend.** Las tablas las crean las migraciones de Flyway. Si alguien las toca a mano desde el panel, el backend de Render puede dejar de arrancar para todos. Si pasa, se reinicia (ver más abajo).
 
-**`SEED_PASSWORD` nunca se usa sobre #1.** Es la misma para los 30 usuarios del seed, así que la de `jugador01` también abre `admin01`. En `DesafioSportsDev` los datos son ficticios y David decide si la comparte.
+**Lo peor que puede pasar en `DesafioSportsDev` es que se rompa el entorno de prueba, y se rehace en minutos.**
 
 ### Preparar `DesafioSportsDev`
 
@@ -72,27 +76,35 @@ Se hace una sola vez. Flyway y el seed hacen casi todo.
    - **`DB_PASSWORD`:** la que se puso al crear el proyecto. Si se perdió, en Project Settings → Database → Reset database password.
    - **`SUPABASE_PUBLISHABLE_KEY`** y la clave `render`: en Project Settings → API Keys.
 
-**Limitación de `DesafioSportsDev`:** los correos de recuperación casi no salen. El servidor de correo por defecto de Supabase solo entrega a miembros de la organización y con un límite bajo por hora. Para probar, mejor las cuentas del seed o "Entrar con Google".
+**Correos de recuperación:** el servidor de correo por defecto de Supabase solo entrega a miembros de la organización, con un límite bajo por hora. Quien esté invitado a la organización de `DesafioSportsDev` sí los recibe; para el resto, mejor las cuentas del seed.
 
-### Activar "Entrar con Google" (opcional, lo hace David)
+### "Entrar con Google" (opcional, lo configura el equipo de la interfaz)
 
-Sin esto, el botón de Google de la web falla y el equipo entra con correo y contraseña. Toma unos 5 minutos si Google ya funciona en #1, porque se reutiliza el mismo proyecto de Google Cloud.
+David no lo configura. Si el equipo lo quiere, lo hace alguien con acceso al panel de `DesafioSportsDev`, con **su propio** proyecto de Google Cloud. Mientras no se haga, el botón de Google de la web falla y se entra con correo y contraseña.
 
 1. **Copiar el callback de Supabase.** En `DesafioSportsDev` → Authentication → Sign In / Providers → Google, copia el **Callback URL**: `https://pugmmpdqmhrlrkyxxcty.supabase.co/auth/v1/callback`.
-2. **Crear un cliente OAuth aparte en Google Cloud.** En el mismo proyecto que usa #1: APIs & Services → Credentials → Create credentials → OAuth client ID. En la consola nueva es Google Auth Platform → Clients → Create client.
-   - Application type: **Web application**. Nombre: `DesafioSportsDev`.
-   - **Authorized redirect URIs:** el callback del paso 1.
-   - Un cliente aparte no toca el de producción y se puede borrar al terminar.
-3. **Pegar las credenciales en Supabase.** De vuelta en el proveedor Google de `DesafioSportsDev`: activarlo, pegar el **Client ID** y el **Client Secret** del cliente nuevo y guardar.
-4. **Probar** desde `http://localhost:5173` con "Entrar con Google".
+2. **Crear el cliente en su Google Cloud**, en un proyecto propio de [console.cloud.google.com](https://console.cloud.google.com):
+   - **Google Auth Platform:** la primera vez pide el nombre de la app, un correo de soporte y Audience **External**.
+   - **Clients → Create client → Web application**, con el callback del paso 1 en **Authorized redirect URIs**.
+3. **Pegar las credenciales en Supabase.** En el proveedor Google de `DesafioSportsDev`: activarlo, pegar el **Client ID** y el **Client Secret** y guardar. Si el rol Developer no deja guardar, David le sube el rol a Administrator: en esa organización solo está el proyecto de prueba.
+4. **Probar** desde `http://localhost:5173`.
 
-**Si Google dice "Acceso bloqueado" o que la app está en pruebas:** la pantalla de consentimiento está en modo *Testing* y solo deja entrar a los correos de la lista de usuarios de prueba. Hay dos salidas:
-- Agregar los correos del equipo en Google Auth Platform → Audience → Test users (antes, OAuth consent screen → Test users).
-- Publicar la app.
+**Si Google dice "Acceso bloqueado":** la app de Google está en modo *Testing*. Quien la creó agrega los correos del equipo en Google Auth Platform → Audience → Test users.
+
+### Si alguien rompe `DesafioSportsDev`
+
+1. **Borrar los schemas.** En el SQL Editor de `DesafioSportsDev`:
+   ```sql
+   DROP SCHEMA IF EXISTS identidad, competicion, finanzas, analytics CASCADE;
+   ```
+   **Revisa dos veces que estás en `DesafioSportsDev` y no en #1.**
+2. **Recrearlos.** En Render: Manual Deploy → Deploy latest commit. Al arrancar, Flyway vuelve a crear los schemas y aplica todas las migraciones.
+3. **Volver a sembrar.** Corre otra vez el seed desde tu máquina. Reutiliza los usuarios que ya existen en Supabase Auth.
+4. **Los demás vuelven a registrarse** al entrar: `GET /api/auth/me` les responde `404 CUENTA_NO_REGISTRADA` y siguen el registro normal.
 
 **Lo haces tú:**
 1. **Crear el servicio en Render** con esos valores (secciones 4 y 5). En el primer arranque, Flyway crea los schemas `identidad`, `competicion`, `finanzas` y `analytics`, y aplica todas las migraciones.
-2. **Correr el seed una vez desde tu máquina**, no desde Render. Usa un `.env` que apunte a `DesafioSportsDev` y que incluya `SUPABASE_SECRET_KEY` y `SEED_PASSWORD`:
+2. **Correr el seed una vez desde tu máquina**, no desde Render. Usa un `.env` que apunte a `DesafioSportsDev` y que incluya `SUPABASE_SECRET_KEY` y un `SEED_PASSWORD` **nuevo, distinto del de #1**:
    ```bash
    .\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=seed"
    ```
@@ -197,7 +209,8 @@ VITE_GATEWAY_URL=https://<nombre>.onrender.com
 - **El contrato de la API es Swagger:** `https://<nombre>.onrender.com/swagger-ui/index.html`. El JSON está en `/v3/api-docs`.
 - **La web tiene que correr en `http://localhost:5173` exacto.** Si Vite salta a 5174 porque el puerto está ocupado, CORS falla.
 - **La primera petición después de un rato puede tardar un minuto** porque la instancia gratis se duerme. Abrir `/actuator/health` la despierta.
-- **Cuentas para probar:** según la sección 2.
+- **Cuentas para probar:** las del seed (`admin01`, `arbitro01`, `delegado01`, `jugador01`…, con correo `@prueba.local`), con el `SEED_PASSWORD` de `DesafioSportsDev`. También pueden registrarse con su propio correo desde la web.
+- **Acceso al panel de `DesafioSportsDev`:** David los invita a la organización aparte (sección 2). Desde ahí ven los datos y pueden configurar Google si lo quieren.
 
 ---
 
