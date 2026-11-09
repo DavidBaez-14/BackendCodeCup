@@ -183,6 +183,24 @@ public abstract class AuthTestSupport {
                 .build());
     }
 
+    @Autowired
+    protected terminus.co.edu.ufps.codecup.competicion.repository.DeporteRepository soporteDeportes;
+
+    /** Spec 0029: el catálogo que en Postgres carga la V10 (en H2 no corre Flyway). Idempotente. */
+    protected void asegurarDeportes() {
+        Object[][] catalogo = {
+            {"FUTSAL", "Fútbol sala", "EQUIPO", 1}, {"VOLEIBOL", "Voleibol", "EQUIPO", 2},
+            {"BALONCESTO", "Baloncesto", "EQUIPO", 3}, {"TENIS_MESA", "Tenis de mesa", "INDIVIDUAL", 4},
+        };
+        for (Object[] d : catalogo) {
+            if (soporteDeportes.existsById((String) d[0])) continue;
+            soporteDeportes.save(terminus.co.edu.ufps.codecup.competicion.model.Deporte.builder()
+                    .codigo((String) d[0]).nombre((String) d[1])
+                    .tipoCompetencia(terminus.co.edu.ufps.codecup.competicion.model.Deporte.TipoCompetencia.valueOf((String) d[2]))
+                    .orden((Integer) d[3]).activo(true).build());
+        }
+    }
+
     /** Un partido sin equipos (basta para probar permisos). */
     protected terminus.co.edu.ufps.codecup.competicion.model.Partido partidoDePrueba(
             terminus.co.edu.ufps.codecup.competicion.model.Torneo torneo) {

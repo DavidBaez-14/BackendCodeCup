@@ -21,12 +21,18 @@ public class TorneoController {
 
     private final TorneoRepository torneoRepository;
     private final TorneoAdminService torneoAdminService;
+    private final terminus.co.edu.ufps.codecup.competicion.service.VisibilidadService visibilidad;
 
+    /** Spec 0029: los públicos y aquellos donde participa; los NO_LISTADO y PRIVADO ajenos no salen. */
     @GetMapping
     @PreAuthorize("@authz.registrado()")
     public ResponseEntity<List<TorneoDTO>> listar() {
+        var quien = terminus.co.edu.ufps.codecup.competicion.service.VisibilidadService.actual();
         var visibles = torneoRepository.findByEstadoInOrderByEdicionDesc(
                 List.of(EstadoTorneo.PUBLICADO, EstadoTorneo.EN_CURSO, EstadoTorneo.FINALIZADO));
-        return ResponseEntity.ok(visibles.stream().map(torneoAdminService::toDTO).toList());
+        return ResponseEntity.ok(visibles.stream()
+                .filter(t -> visibilidad.puedeVer(t, quien, false))
+                .map(torneoAdminService::toDTO)
+                .toList());
     }
 }

@@ -30,7 +30,7 @@ public class SolicitudController {
             @RequestBody SolicitudRequestDTO req,
             @AuthenticationPrincipal Jwt jwt) {
         UUID personaId = JwtClaims.personaId(jwt);
-        return ResponseEntity.ok(solicitudService.crear(personaId, req.getEquipoTorneoId()));
+        return ResponseEntity.ok(solicitudService.crear(personaId, req.getEquipoTorneoId(), req.getEnlaceToken()));
     }
 
     @GetMapping("/mis-solicitudes")

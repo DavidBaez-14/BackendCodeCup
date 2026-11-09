@@ -153,7 +153,7 @@ class FlywayBaselineTest {
         var versiones = jdbc.queryForList(
                 "select version from identidad.flyway_schema_history where success and version is not null order by installed_rank",
                 String.class);
-        assertThat(versiones).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9");
+        assertThat(versiones).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10");
 
         var schemas = jdbc.queryForList(
                 "select schema_name from information_schema.schemata where schema_name in ('identidad','competicion','finanzas','analytics')",
@@ -205,6 +205,27 @@ class FlywayBaselineTest {
         // Los ADMIN de la V7 quedan con el permiso en false (no aplica a ellos).
         assertThat(jdbc.queryForObject(
                 "select count(*) from competicion.torneo_roles where rol = 'ADMIN' and todos_los_partidos", Integer.class)).isZero();
+    }
+
+    /**
+     * Spec 0029: los torneos que ya existían quedan de fútbol sala y PUBLICO (como se veían), cada
+     * uno con su enlace distinto, y el catálogo trae los cuatro deportes.
+     */
+    @Test
+    void v10_torneosExistentes_futsalPublicos_conEnlace_yCatalogo() {
+        var filas = jdbc.queryForList(
+                "select deporte, visibilidad, enlace_token from competicion.torneos where id in (?, ?)", TORNEO, TORNEO_2);
+        assertThat(filas).hasSize(2).allSatisfy(f -> {
+            assertThat(f.get("deporte")).isEqualTo("FUTSAL");
+            assertThat(f.get("visibilidad")).isEqualTo("PUBLICO");
+            assertThat((String) f.get("enlace_token")).isNotBlank();
+        });
+        assertThat(filas.get(0).get("enlace_token")).isNotEqualTo(filas.get(1).get("enlace_token"));
+        assertThat(jdbc.queryForList("select codigo from competicion.deportes order by orden", String.class))
+                .containsExactly("FUTSAL", "VOLEIBOL", "BALONCESTO", "TENIS_MESA");
+        var error = org.assertj.core.api.Assertions.catchThrowable(() -> jdbc.update(
+                "update competicion.torneos set deporte = 'AJEDREZ' where id = ?", TORNEO));
+        assertThat(error).hasMessageContaining("torneos_deporte_fk");
     }
 
     /** Spec 0024: una invitación a la plataforma sigue necesitando correo; una con ámbito, no. */

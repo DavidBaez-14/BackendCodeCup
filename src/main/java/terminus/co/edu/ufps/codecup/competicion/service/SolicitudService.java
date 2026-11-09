@@ -27,6 +27,7 @@ public class SolicitudService {
     private final JugadorEquipoRepository jugadorEquipoRepo;
     private final PerfilDeportivoRepository perfilRepo;
     private final DirectorioPersonas directorioPersonas;
+    private final VisibilidadService visibilidad;
 
     // ──────────────────────────────────────────────
     //  JUGADOR: crear solicitud de ingreso
@@ -34,6 +35,12 @@ public class SolicitudService {
 
     @Transactional
     public SolicitudDTO crear(UUID personaId, UUID equipoTorneoId) {
+        return crear(personaId, equipoTorneoId, null);
+    }
+
+    /** Spec 0029: en un torneo NO_LISTADO se pide con su {@code enlaceToken}; en uno PRIVADO ajeno, 404. */
+    @Transactional
+    public SolicitudDTO crear(UUID personaId, UUID equipoTorneoId, String enlaceToken) {
         if (equipoTorneoId == null) {
             throw new RuntimeException("equipoTorneoId es obligatorio.");
         }
@@ -44,6 +51,7 @@ public class SolicitudService {
             throw new RuntimeException("Ese equipo fue rechazado en el torneo; no puedes unirte.");
         }
         var torneo = equipoTorneo.getTorneo();
+        visibilidad.exigirVisible(torneo, VisibilidadService.actual(), VisibilidadService.conEnlace(torneo, enlaceToken));
         if (torneo.getEstado() != EstadoTorneo.PUBLICADO && torneo.getEstado() != EstadoTorneo.EN_CURSO) {
             throw new RuntimeException("El torneo no esta aceptando jugadores.");
         }

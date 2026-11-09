@@ -9,4 +9,7 @@ import java.util.UUID;
 @AllArgsConstructor
 public class SolicitudRequestDTO {
     private UUID equipoTorneoId;
+
+    /** Spec 0029: el token del enlace, para pedir unirse en un torneo NO_LISTADO. */
+    private String enlaceToken;
 }

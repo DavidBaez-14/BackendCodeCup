@@ -55,6 +55,7 @@ public class TorneoAdminService {
     private final DirectorioPersonas directorioPersonas;
     private final RolesTorneoService rolesTorneoService;
     private final PermisosTorneo permisos;
+    private final ReglasInscripcion reglasInscripcion;
     private final terminus.co.edu.ufps.codecup.competicion.repository.PartidoArbitroRepository partidoArbitroRepo;
 
     /** Spec 0024: quien lo crea queda como su admin (sin rol global). */
@@ -270,6 +271,7 @@ public class TorneoAdminService {
         if (et.getEstadoInscripcion() == EstadoInscripcion.EXPULSADO) {
             throw new RuntimeException("El equipo fue descalificado del torneo y no puede aprobarse.");
         }
+        reglasInscripcion.exigirCupo(et.getTorneo()); // spec 0029
         et.setEstadoInscripcion(EstadoInscripcion.APROBADO);
         et.setAprobadoPorCuentaId(adminCuentaId);
         et.setMotivoRechazo(null);
@@ -574,6 +576,11 @@ public class TorneoAdminService {
                 .publicadoEn(t.getPublicadoEn())
                 .formato(t.getFormato() != null ? t.getFormato().name() : null)
                 .exigeDocumento(Boolean.TRUE.equals(t.getExigeDocumento()))
+                .deporte(t.getDeporte())
+                .visibilidad(t.getVisibilidad() != null ? t.getVisibilidad().name() : null)
+                .cupos(t.getCupos())
+                .cierreInscripciones(t.getCierreInscripciones())
+                .reglas(t.getReglas())
                 .build();
     }
 }

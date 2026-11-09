@@ -20,11 +20,15 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PremiosController {
 
+    /** Spec 0029: un torneo PRIVADO o en borrador no se ve por id si no participas. */
+    private final terminus.co.edu.ufps.codecup.competicion.service.VisibilidadService visibilidad;
+
     private final CompeticionDatosService datos;
     private final DirectorioPersonas directorioPersonas;
 
     @GetMapping("/{torneoId}/premios")
     public ResponseEntity<List<PremioPublicoDTO>> premios(@PathVariable UUID torneoId) {
+        visibilidad.exigirVisiblePorId(torneoId);
         var origen = datos.obtenerPremios(torneoId);
         List<PremioPublicoDTO> result = new ArrayList<>();
         int orden = 1;

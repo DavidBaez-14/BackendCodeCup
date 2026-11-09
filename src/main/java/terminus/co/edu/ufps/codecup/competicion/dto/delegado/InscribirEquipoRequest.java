@@ -15,4 +15,7 @@ public class InscribirEquipoRequest {
 
     /** Un equipo nuevo con este nombre. Tiene prioridad sobre {@code equipoId}. */
     private String nombreEquipo;
+
+    /** Spec 0029: el token del enlace, para inscribirse en un torneo NO_LISTADO. */
+    private String enlaceToken;
 }

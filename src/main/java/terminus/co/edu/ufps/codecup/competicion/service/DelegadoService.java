@@ -44,6 +44,8 @@ public class DelegadoService {
     private final TorneoAdminService torneoAdminService;
     private final DirectorioPersonas directorioPersonas;
     private final ComprobanteRepository comprobanteRepo;
+    private final VisibilidadService visibilidad;
+    private final ReglasInscripcion reglasInscripcion;
 
     @Transactional(readOnly = true)
     public InscripcionInfoDTO obtenerInscripcionInfo(UUID delegadoPersonaId, UUID torneoId) {
@@ -144,7 +146,9 @@ public class DelegadoService {
     public List<TorneoDisponibleDTO> torneosDisponibles(UUID delegadoPersonaId) {
         var publicados = torneoRepo.findByEstadoInOrderByEdicionDesc(
                 List.of(EstadoTorneo.PUBLICADO, EstadoTorneo.EN_CURSO));
-        return publicados.stream().map(t -> {
+        // Spec 0029: solo los públicos y aquellos donde ya participa (los NO_LISTADO y PRIVADO no se listan).
+        var quien = VisibilidadService.actual();
+        return publicados.stream().filter(t -> visibilidad.puedeVer(t, quien, false)).map(t -> {
             var inscripcion = equipoTorneoRepo.findByTorneoIdAndDelegadoPersonaId(t.getId(), delegadoPersonaId);
             return TorneoDisponibleDTO.builder()
                     .id(t.getId())
@@ -175,9 +179,12 @@ public class DelegadoService {
     public InscripcionDTO inscribir(UUID delegadoPersonaId, UUID torneoId, InscribirEquipoRequest req) {
         var torneo = torneoRepo.findById(torneoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Torneo no encontrado."));
-        if (torneo.getEstado() != EstadoTorneo.PUBLICADO) {
-            throw ApiException.conflict("INSCRIPCIONES_CERRADAS", "Solo se puede inscribir a torneos con inscripciones abiertas.");
-        }
+        // Spec 0029: un NO_LISTADO se inscribe con su enlace; un PRIVADO, solo por invitación.
+        visibilidad.exigirVisible(torneo, VisibilidadService.actual(),
+                VisibilidadService.conEnlace(torneo, req != null ? req.getEnlaceToken() : null));
+        reglasInscripcion.exigirAbiertas(torneo);
+        reglasInscripcion.exigirPorEquipos(torneo);
+        reglasInscripcion.exigirCupo(torneo);
         // Spec 0023: si el torneo exige documento, el delegado (que entra al plantel) debe tenerlo.
         if (Boolean.TRUE.equals(torneo.getExigeDocumento())
                 && directorioPersonas.requerir(delegadoPersonaId).numeroDocumento() == null) {

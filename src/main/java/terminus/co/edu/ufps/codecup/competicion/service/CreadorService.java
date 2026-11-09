@@ -30,6 +30,7 @@ public class CreadorService {
     private final EquipoTorneoRepository equipoTorneoRepo;
     private final ComprobanteRepository comprobanteRepo;
     private final PermisosTorneo permisos;
+    private final TorneoCreacionService torneoCreacionService;
 
     /** Resumen para "Tus secciones" en Inicio (spec 0026). */
     public record Resumen(int torneos, int porRevisar) {
@@ -72,6 +73,10 @@ public class CreadorService {
                 .formato(t.getFormato() != null ? t.getFormato().name() : null)
                 .fechaInicio(t.getFechaInicio())
                 .fechaFin(t.getFechaFin())
+                .deporte(t.getDeporte())
+                .visibilidad(t.getVisibilidad() != null ? t.getVisibilidad().name() : null)
+                .cupos(t.getCupos())
+                .enlace(torneoCreacionService.enlace(t))
                 .inscritos(aprobados)
                 .pendientes(new CreadorTorneoDTO.Pendientes(inscripcionesPendientes(t.getId()), comprobantes))
                 .creadoEn(t.getCreatedAt())

@@ -32,6 +32,7 @@ public class ComprobanteService {
     private final MultaRepository multaRepo;
     private final DirectorioPersonas directorioPersonas;
     private final terminus.co.edu.ufps.codecup.competicion.service.PermisosTorneo permisos;
+    private final terminus.co.edu.ufps.codecup.competicion.service.ReglasInscripcion reglasInscripcion;
 
     @Transactional
     public ComprobanteDTO subir(SubirComprobanteRequest req, UUID personaUploader, UUID cuentaUploader) {
@@ -153,6 +154,7 @@ public class ComprobanteService {
                         "La inscripcion ya no esta pendiente de pago (estado: " + et.getEstadoInscripcion()
                                 + "); no se puede aprobar este comprobante.");
             }
+            reglasInscripcion.exigirCupo(et.getTorneo()); // spec 0029
             et.setEstadoInscripcion(EstadoInscripcion.APROBADO);
             et.setAprobadoPorCuentaId(cuentaAdmin);
             equipoTorneoRepo.save(et);

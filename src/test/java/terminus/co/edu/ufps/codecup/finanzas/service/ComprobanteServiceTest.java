@@ -43,6 +43,7 @@ class ComprobanteServiceTest {
     @Mock EquipoTorneoRepository equipoTorneoRepo;
     @Mock MultaRepository multaRepo;
     @Mock DirectorioPersonas directorioPersonas;
+    @Mock terminus.co.edu.ufps.codecup.competicion.service.ReglasInscripcion reglasInscripcion;
     @InjectMocks ComprobanteService service;
 
     private static final UUID REF = UUID.randomUUID();

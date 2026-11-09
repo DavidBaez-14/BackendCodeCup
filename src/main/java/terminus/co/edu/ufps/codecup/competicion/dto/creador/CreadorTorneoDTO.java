@@ -28,6 +28,8 @@ public class CreadorTorneoDTO {
     private String visibilidad;
     /** Spec 0029: máximo de inscripciones aprobadas; null = sin límite. */
     private Integer cupos;
+    /** Spec 0029: el enlace para compartir. */
+    private String enlace;
     /** Inscripciones aprobadas. */
     private int inscritos;
     private Pendientes pendientes;

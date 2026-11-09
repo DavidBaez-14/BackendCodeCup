@@ -18,10 +18,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PosicionesController {
 
+    /** Spec 0029: un torneo PRIVADO o en borrador no se ve por id si no participas. */
+    private final terminus.co.edu.ufps.codecup.competicion.service.VisibilidadService visibilidad;
+
     private final PosicionesService service;
 
     @GetMapping("/{torneoId}/posiciones")
     public ResponseEntity<Map<String, List<PosicionDTO>>> posiciones(@PathVariable UUID torneoId) {
+        visibilidad.exigirVisiblePorId(torneoId);
         return ResponseEntity.ok(service.obtenerPorGrupo(torneoId));
     }
 }

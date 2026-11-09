@@ -44,6 +44,7 @@ class TorneoAdminServiceComprobanteSyncTest {
     @Mock EventoPartidoRepository eventoPartidoRepo;
     @Mock DirectorioPersonas directorioPersonas;
     @Mock TituloRepository tituloRepo;
+    @Mock ReglasInscripcion reglasInscripcion;
     @InjectMocks TorneoAdminService service;
 
     private static final UUID TORNEO = UUID.randomUUID();

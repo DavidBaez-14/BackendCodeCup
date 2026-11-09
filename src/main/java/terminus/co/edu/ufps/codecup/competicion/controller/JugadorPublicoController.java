@@ -32,10 +32,17 @@ public class JugadorPublicoController {
     private final JugadorEquipoRepository jugadorEquipoRepo;
     private final DirectorioPersonas directorioPersonas;
 
+    private final terminus.co.edu.ufps.codecup.competicion.service.VisibilidadService visibilidad;
+
+    /** Spec 0029: un NO_LISTADO ajeno se ve con {@code ?enlace=}; un PRIVADO ajeno, nunca (404). */
     @GetMapping("/torneos/{torneoId}/equipos")
-    public ResponseEntity<List<EquipoEnTorneoDTO>> equiposPorTorneo(@PathVariable UUID torneoId) {
+    public ResponseEntity<List<EquipoEnTorneoDTO>> equiposPorTorneo(
+            @PathVariable UUID torneoId,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String enlace) {
         var torneo = torneoRepo.findById(torneoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Torneo no encontrado."));
+        visibilidad.exigirVisible(torneo, terminus.co.edu.ufps.codecup.competicion.service.VisibilidadService.actual(),
+                terminus.co.edu.ufps.codecup.competicion.service.VisibilidadService.conEnlace(torneo, enlace));
         if (torneo.getEstado() != EstadoTorneo.PUBLICADO && torneo.getEstado() != EstadoTorneo.EN_CURSO) {
             throw new RuntimeException("El torneo no esta aceptando jugadores.");
         }

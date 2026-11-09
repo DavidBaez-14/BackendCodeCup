@@ -68,6 +68,7 @@ public class MisEquiposService {
                 .equipo(et.getEquipo().getNombre())
                 .torneoId(torneo.getId())
                 .torneo(torneo.getNombre())
+                .deporte(torneo.getDeporte())
                 .estadoTorneo(torneo.getEstado() != null ? torneo.getEstado().name() : null)
                 .rol(rol)
                 .estadoInscripcion(et.getEstadoInscripcion().name())

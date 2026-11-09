@@ -48,6 +48,7 @@ public class CupoEquipoService {
     private final TorneoAdminService torneoAdminService;
     private final DirectorioPersonas directorioPersonas;
     private final Invitaciones invitaciones;
+    private final ReglasInscripcion reglasInscripcion;
 
     /** El cupo de un equipo en el torneo, con su enlace. Sin correo, lo toma quien abra el enlace. */
     @Transactional
@@ -88,11 +89,15 @@ public class CupoEquipoService {
             throw ApiException.conflict("DOCUMENTO_REQUERIDO",
                     "Este torneo exige documento: agrega el tuyo en tu perfil y vuelve a abrir la invitación.");
         }
-        String nombre = e.datoExtra() != null && !e.datoExtra().isBlank() ? e.datoExtra().trim() : "Equipo";
-        var equipo = equipoRepo.save(Equipo.builder().nombre(nombre).delegadoPersonaId(persona).build());
+        reglasInscripcion.exigirPorEquipos(torneo); // spec 0029
         // El admin ya decidió que el equipo entra: si no se cobra, queda aprobado; si se cobra,
         // espera el comprobante como cualquier inscripción.
         boolean cobra = torneo.getMontoInscripcion() != null && torneo.getMontoInscripcion().compareTo(BigDecimal.ZERO) > 0;
+        if (!cobra) {
+            reglasInscripcion.exigirCupo(torneo); // spec 0029
+        }
+        String nombre = e.datoExtra() != null && !e.datoExtra().isBlank() ? e.datoExtra().trim() : "Equipo";
+        var equipo = equipoRepo.save(Equipo.builder().nombre(nombre).delegadoPersonaId(persona).build());
         var et = delegadoService.registrarInscripcion(torneo, equipo, persona,
                 cobra ? EstadoInscripcion.PENDIENTE_PAGO : EstadoInscripcion.APROBADO);
         if (!cobra) {

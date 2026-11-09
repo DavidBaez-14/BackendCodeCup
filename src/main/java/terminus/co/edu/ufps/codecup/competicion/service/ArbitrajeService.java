@@ -196,6 +196,7 @@ public class ArbitrajeService {
                 .partidoId(p.getId())
                 .torneoId(p.getTorneo().getId())
                 .torneo(p.getTorneo().getNombre())
+                .deporte(p.getTorneo().getDeporte())
                 .fase(EtiquetasPartido.fase(p))
                 .faseCodigo(p.getFase() != null ? p.getFase().name() : null)
                 .jornada(p.getJornada())

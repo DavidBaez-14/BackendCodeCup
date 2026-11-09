@@ -21,4 +21,12 @@ public class TorneoDTO {
     private String formato;
     /** Spec 0023: el torneo exige documento a sus miembros. */
     private Boolean exigeDocumento;
+    /** Spec 0029: código del deporte. */
+    private String deporte;
+    /** Spec 0029: PUBLICO, NO_LISTADO o PRIVADO. */
+    private String visibilidad;
+    /** Spec 0029: máximo de inscripciones aprobadas; null = sin límite. */
+    private Integer cupos;
+    private java.time.LocalDate cierreInscripciones;
+    private String reglas;
 }

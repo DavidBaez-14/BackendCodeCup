@@ -81,4 +81,48 @@ public class Torneo {
 
     @Column(name = "titular_cuenta", length = 150)
     private String titularCuenta;
+
+    // ─── Spec 0029: deporte, visibilidad y cupos ──────────────────
+
+    /** Código del catálogo {@code competicion.deportes}. */
+    @Builder.Default
+    @Column(name = "deporte", nullable = false, length = 30)
+    private String deporte = Deporte.FUTSAL;
+
+    /** Por defecto PUBLICO, como se comportaban los torneos antes de la 0029. */
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "visibilidad", nullable = false, length = 20)
+    private Visibilidad visibilidad = Visibilidad.PUBLICO;
+
+    /** Para el enlace de compartir; se regenera para revocar un enlace filtrado. */
+    @Column(name = "enlace_token", nullable = false, unique = true, length = 64)
+    private String enlaceToken;
+
+    /** Máximo de inscripciones aprobadas; null = sin límite. */
+    @Column(name = "cupos")
+    private Integer cupos;
+
+    /** Último día para inscribirse; null = hasta que el organizador las cierre. */
+    @Column(name = "cierre_inscripciones")
+    private LocalDate cierreInscripciones;
+
+    @Column(name = "reglas", length = 2000)
+    private String reglas;
+
+    @jakarta.persistence.PrePersist
+    void asegurarEnlace() {
+        if (enlaceToken == null) {
+            enlaceToken = nuevoEnlaceToken();
+        }
+    }
+
+    private static final java.security.SecureRandom RANDOM = new java.security.SecureRandom();
+
+    /** 16 bytes al azar en base64url (22 caracteres). */
+    public static String nuevoEnlaceToken() {
+        byte[] bytes = new byte[16];
+        RANDOM.nextBytes(bytes);
+        return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
 }
