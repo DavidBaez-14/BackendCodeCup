@@ -162,7 +162,7 @@ public class SolicitudService {
     private void validarDelegadoEsDueno(SolicitudEquipo solicitud, UUID delegadoPersonaId) {
         var et = solicitud.getEquipoTorneo();
         if (et.getDelegadoPersonaId() == null || !et.getDelegadoPersonaId().equals(delegadoPersonaId)) {
-            throw new RuntimeException("No eres el delegado de este equipo.");
+            throw DelegadoService.noDelegado();
         }
     }
 

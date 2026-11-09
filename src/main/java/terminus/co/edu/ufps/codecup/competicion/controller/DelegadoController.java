@@ -8,6 +8,7 @@ import terminus.co.edu.ufps.codecup.competicion.dto.admin.InscripcionInfoDTO;
 import terminus.co.edu.ufps.codecup.competicion.dto.delegado.ActualizarCamisetaRequest;
 import terminus.co.edu.ufps.codecup.competicion.dto.delegado.AgregarMiembroRequest;
 import terminus.co.edu.ufps.codecup.competicion.dto.delegado.CrearEquipoRequest;
+import terminus.co.edu.ufps.codecup.competicion.dto.delegado.InscribirEquipoRequest;
 import terminus.co.edu.ufps.codecup.competicion.dto.delegado.MiembroEquipoDTO;
 import terminus.co.edu.ufps.codecup.competicion.dto.delegado.TorneoDisponibleDTO;
 import terminus.co.edu.ufps.codecup.competicion.service.DelegadoService;
@@ -26,7 +27,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/supercopa/delegado")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('DELEGADO')")
+@PreAuthorize("@authz.registrado()")
 public class DelegadoController {
 
     private final DelegadoService delegadoService;
@@ -38,6 +39,13 @@ public class DelegadoController {
         return ResponseEntity.ok(delegadoService.crearEquipo(JwtClaims.personaId(jwt), req));
     }
 
+    /** Spec 0026: todos sus equipos base, el más reciente primero. */
+    @GetMapping("/equipos")
+    public ResponseEntity<List<EquipoDTO>> misEquipos(@AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(delegadoService.misEquiposBase(JwtClaims.personaId(jwt)));
+    }
+
+    /** Compatibilidad con la web: el equipo base más reciente. */
     @GetMapping("/equipos/mi-equipo")
     public ResponseEntity<EquipoDTO> miEquipo(@AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(delegadoService.miEquipo(JwtClaims.personaId(jwt)));
@@ -56,11 +64,16 @@ public class DelegadoController {
                 JwtClaims.personaId(jwt), torneoId));
     }
 
+    /**
+     * Spec 0026: sin rol global. Cuerpo opcional {@code {equipoId?, nombreEquipo?}}; sin cuerpo se
+     * inscribe el único equipo de la persona (400 EQUIPO_REQUERIDO si tiene varios o ninguno).
+     */
     @PostMapping("/torneos/{torneoId}/inscribir")
     public ResponseEntity<InscripcionDTO> inscribir(
             @PathVariable UUID torneoId,
+            @RequestBody(required = false) InscribirEquipoRequest req,
             @AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok(delegadoService.inscribir(JwtClaims.personaId(jwt), torneoId));
+        return ResponseEntity.ok(delegadoService.inscribir(JwtClaims.personaId(jwt), torneoId, req));
     }
 
     @GetMapping("/inscripciones/mias")

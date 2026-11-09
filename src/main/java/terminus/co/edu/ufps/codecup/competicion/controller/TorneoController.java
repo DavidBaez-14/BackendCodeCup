@@ -23,7 +23,7 @@ public class TorneoController {
     private final TorneoAdminService torneoAdminService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('JUGADOR','DELEGADO','ADMINISTRADOR')")
+    @PreAuthorize("@authz.registrado()")
     public ResponseEntity<List<TorneoDTO>> listar() {
         var visibles = torneoRepository.findByEstadoInOrderByEdicionDesc(
                 List.of(EstadoTorneo.PUBLICADO, EstadoTorneo.EN_CURSO, EstadoTorneo.FINALIZADO));

@@ -119,7 +119,8 @@ public class RolesTorneoService {
     @EventListener
     @Transactional
     public void alAceptarInvitacion(InvitacionConAmbitoAceptada e) {
-        if (e.ambito() != AmbitoInvitacion.TORNEO) return;
+        // Los cupos de delegado (rol DELEGADO) los aplica CupoEquipoService (spec 0026).
+        if (e.ambito() != AmbitoInvitacion.TORNEO || e.rol() == Rol.DELEGADO) return;
         var torneo = torneoRepo.findById(e.ambitoId())
                 .orElseThrow(() -> ApiException.notFound("TORNEO_NO_ENCONTRADO", "El torneo de esta invitación ya no existe."));
         otorgar(torneo, e.cuentaId(), aRolDeTorneo(e.rol()), e.creadaPorCuentaId());

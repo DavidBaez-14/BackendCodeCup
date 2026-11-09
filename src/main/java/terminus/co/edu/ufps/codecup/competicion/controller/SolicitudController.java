@@ -40,25 +40,25 @@ public class SolicitudController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('DELEGADO')")
+    @PreAuthorize("@authz.registrado()")
     public ResponseEntity<List<SolicitudDTO>> listarSolicitudes(@AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(solicitudService.listarSolicitudesDelegado(JwtClaims.personaId(jwt)));
     }
 
     @GetMapping("/pendientes")
-    @PreAuthorize("hasRole('DELEGADO')")
+    @PreAuthorize("@authz.registrado()")
     public ResponseEntity<List<SolicitudDTO>> listarPendientes(@AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(solicitudService.listarPendientesDelegado(JwtClaims.personaId(jwt)));
     }
 
     @PostMapping("/{id}/aprobar")
-    @PreAuthorize("hasRole('DELEGADO')")
+    @PreAuthorize("@authz.registrado()")
     public ResponseEntity<SolicitudDTO> aprobar(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(solicitudService.aprobar(id, JwtClaims.personaId(jwt)));
     }
 
     @PostMapping("/{id}/rechazar")
-    @PreAuthorize("hasRole('DELEGADO')")
+    @PreAuthorize("@authz.registrado()")
     public ResponseEntity<SolicitudDTO> rechazar(
             @PathVariable UUID id,
             @RequestBody RechazoRequestDTO req,

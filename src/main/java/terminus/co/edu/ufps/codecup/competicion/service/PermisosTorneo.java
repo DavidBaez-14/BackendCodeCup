@@ -82,6 +82,12 @@ public class PermisosTorneo {
                 .orElse(false);
     }
 
+    /** Spec 0026: es el delegado de alguna inscripción, en cualquier torneo. */
+    @Transactional(readOnly = true)
+    public boolean esDelegadoDeAlgo(UUID personaId) {
+        return personaId != null && equipoTorneoRepo.existsByDelegadoPersonaId(personaId);
+    }
+
     /** 404 si el torneo no existe. */
     @Transactional(readOnly = true)
     public void exigirTorneo(UUID torneoId) {

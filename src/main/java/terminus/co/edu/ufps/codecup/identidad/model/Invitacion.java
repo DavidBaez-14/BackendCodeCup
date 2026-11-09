@@ -67,6 +67,10 @@ public class Invitacion {
     @Column(name = "ambito_descripcion", length = 200)
     private String ambitoDescripcion;
 
+    /** Spec 0026: lo que el ámbito necesita además del rol; en un cupo de delegado, el nombre del equipo. */
+    @Column(name = "dato_extra", length = 150)
+    private String datoExtra;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private EstadoInvitacion estado;

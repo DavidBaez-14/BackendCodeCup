@@ -26,6 +26,16 @@ public class Invitaciones {
                 creadorCuentaId);
     }
 
+    /**
+     * Spec 0026, camino (b): el cupo de un equipo en un torneo. Quien acepte queda como delegado de
+     * un equipo nuevo con ese nombre, inscrito en el torneo.
+     */
+    public InvitacionDTO cupoDeEquipo(UUID torneoId, String nombreTorneo, String nombreEquipo, String correo,
+                                      UUID creadorCuentaId) {
+        return invitacionService.crearConAmbito(AmbitoInvitacion.TORNEO, torneoId,
+                nombreEquipo + " · " + nombreTorneo, Rol.DELEGADO, correo, nombreEquipo, creadorCuentaId);
+    }
+
     public List<InvitacionDTO> pendientesDeTorneo(UUID torneoId) {
         return invitacionService.pendientesDe(AmbitoInvitacion.TORNEO, torneoId);
     }

@@ -23,6 +23,9 @@ public class InvitacionDTO {
 
     private String ambitoDescripcion;
 
+    /** Spec 0026: en un cupo de delegado, el nombre del equipo. */
+    private String datoExtra;
+
     private String estado;
 
     private String token;

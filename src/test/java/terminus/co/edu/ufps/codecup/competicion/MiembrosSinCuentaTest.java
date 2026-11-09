@@ -228,12 +228,12 @@ class MiembrosSinCuentaTest extends AuthTestSupport {
         agregar(a, Map.of("numeroDocumento", documentoAlAzar(), "nombre", "Yolanda", "numeroCamiseta", 10))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("REGLA_NEGOCIO"));
 
-        // Un delegado no agrega en la inscripción de otro.
+        // Un delegado no agrega en la inscripción de otro (spec 0026: 403 con código propio).
         mvc.perform(post("/api/supercopa/delegado/equipo-torneo/{id}/miembros", a.inscripcion().getId())
                         .header("Authorization", b.delegado().bearer())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(cuerpo(documentoAlAzar(), "Zoe"))))
-                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("REGLA_NEGOCIO"));
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("NO_DELEGADO_DE_LA_INSCRIPCION"));
 
         // Se retira, vuelve (con el nombre guardado) y cambia de camiseta.
         mvc.perform(post("/api/supercopa/delegado/equipo-torneo/{id}/miembros/{personaId}/remover",

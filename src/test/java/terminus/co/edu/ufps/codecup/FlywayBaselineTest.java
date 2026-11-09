@@ -153,7 +153,7 @@ class FlywayBaselineTest {
         var versiones = jdbc.queryForList(
                 "select version from identidad.flyway_schema_history where success and version is not null order by installed_rank",
                 String.class);
-        assertThat(versiones).containsExactly("1", "2", "3", "4", "5", "6", "7", "8");
+        assertThat(versiones).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9");
 
         var schemas = jdbc.queryForList(
                 "select schema_name from information_schema.schemata where schema_name in ('identidad','competicion','finanzas','analytics')",

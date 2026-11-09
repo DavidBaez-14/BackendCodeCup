@@ -27,7 +27,7 @@ public class ComprobanteController {
 
     /** Spec 0001: solo para una inscripción propia y pendiente de pago. */
     @PostMapping("/upload-url")
-    @PreAuthorize("hasRole('DELEGADO')")
+    @PreAuthorize("@authz.registrado()")
     public ResponseEntity<UploadUrlResponse> solicitarUploadUrl(
             @Valid @RequestBody SolicitudUploadUrlRequest req,
             @AuthenticationPrincipal Jwt jwt) {
@@ -53,7 +53,7 @@ public class ComprobanteController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('DELEGADO')")
+    @PreAuthorize("@authz.registrado()")
     public ResponseEntity<ComprobanteDTO> subir(
             @Valid @RequestBody SubirComprobanteRequest req,
             @AuthenticationPrincipal Jwt jwt) {
@@ -61,7 +61,7 @@ public class ComprobanteController {
     }
 
     @GetMapping("/mis-comprobantes")
-    @PreAuthorize("hasRole('DELEGADO')")
+    @PreAuthorize("@authz.registrado()")
     public ResponseEntity<List<ComprobanteDTO>> misComprobantes(@AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(comprobanteService.misComprobantes(JwtClaims.cuentaId(jwt)));
     }

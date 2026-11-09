@@ -14,6 +14,7 @@ import terminus.co.edu.ufps.codecup.competicion.dto.admin.InscripcionDTO;
 import terminus.co.edu.ufps.codecup.competicion.dto.admin.InscripcionInfoDTO;
 import terminus.co.edu.ufps.codecup.competicion.dto.delegado.AgregarMiembroRequest;
 import terminus.co.edu.ufps.codecup.competicion.dto.delegado.CrearEquipoRequest;
+import terminus.co.edu.ufps.codecup.competicion.dto.delegado.InscribirEquipoRequest;
 import terminus.co.edu.ufps.codecup.competicion.dto.delegado.MiembroEquipoDTO;
 import terminus.co.edu.ufps.codecup.competicion.dto.delegado.TorneoDisponibleDTO;
 import terminus.co.edu.ufps.codecup.competicion.model.*;
@@ -76,27 +77,67 @@ public class DelegadoService {
             throw new RuntimeException("El nombre del equipo es obligatorio.");
         }
         directorioPersonas.requerir(delegadoPersonaId);
-
-        // Un delegado solo puede tener un equipo base.
-        var existente = equipoRepo.findByDelegadoPersonaId(delegadoPersonaId);
-        if (existente.isPresent()) {
-            throw new RuntimeException("Ya tienes un equipo creado: \""
-                    + existente.get().getNombre() + "\". No puedes crear otro.");
-        }
-
-        var equipo = Equipo.builder()
-                .nombre(req.getNombre().trim())
-                .delegadoPersonaId(delegadoPersonaId)
-                .build();
-        equipoRepo.save(equipo);
+        var equipo = nuevoEquipo(delegadoPersonaId, req.getNombre());
         return EquipoDTO.builder().id(equipo.getId()).nombre(equipo.getNombre()).build();
     }
 
+    /**
+     * Spec 0026 (Q1): una persona puede tener varios equipos base (por ejemplo, uno por deporte).
+     * Lo que no puede es repetir el nombre entre los suyos: 409 EQUIPO_DUPLICADO.
+     */
+    private Equipo nuevoEquipo(UUID delegadoPersonaId, String nombreEscrito) {
+        String nombre = nombreEscrito == null ? "" : nombreEscrito.trim();
+        if (nombre.isEmpty()) {
+            throw ApiException.badRequest("NOMBRE_INVALIDO", "El nombre del equipo es obligatorio.");
+        }
+        if (nombre.length() > 150) {
+            throw ApiException.badRequest("NOMBRE_INVALIDO", "El nombre del equipo no puede tener más de 150 caracteres.");
+        }
+        boolean repetido = equipoRepo.findByDelegadoPersonaIdOrderByCreatedAtDesc(delegadoPersonaId).stream()
+                .anyMatch(e -> e.getNombre().equalsIgnoreCase(nombre));
+        if (repetido) {
+            throw ApiException.conflict("EQUIPO_DUPLICADO", "Ya tienes un equipo llamado \"" + nombre + "\".");
+        }
+        return equipoRepo.save(Equipo.builder().nombre(nombre).delegadoPersonaId(delegadoPersonaId).build());
+    }
+
+    /** Compatibilidad con la web: el equipo base más reciente. 404 si no tiene ninguno. */
     @Transactional(readOnly = true)
     public EquipoDTO miEquipo(UUID delegadoPersonaId) {
-        var equipo = equipoRepo.findByDelegadoPersonaId(delegadoPersonaId)
+        var equipo = equipoRepo.findByDelegadoPersonaIdOrderByCreatedAtDesc(delegadoPersonaId).stream().findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Aun no has creado tu equipo."));
         return EquipoDTO.builder().id(equipo.getId()).nombre(equipo.getNombre()).build();
+    }
+
+    /** Spec 0026: todos sus equipos base, el más reciente primero. */
+    @Transactional(readOnly = true)
+    public List<EquipoDTO> misEquiposBase(UUID delegadoPersonaId) {
+        return equipoRepo.findByDelegadoPersonaIdOrderByCreatedAtDesc(delegadoPersonaId).stream()
+                .map(e -> EquipoDTO.builder().id(e.getId()).nombre(e.getNombre()).build())
+                .toList();
+    }
+
+    /**
+     * Qué equipo se inscribe (spec 0026): el que nombra {@code equipoId} (debe ser suyo), uno nuevo
+     * con {@code nombreEquipo}, o el único que tiene. Con varios y sin elegir: 400 EQUIPO_REQUERIDO.
+     */
+    private Equipo equipoParaInscribir(UUID delegadoPersonaId, InscribirEquipoRequest req) {
+        if (req != null && req.getNombreEquipo() != null && !req.getNombreEquipo().isBlank()) {
+            return nuevoEquipo(delegadoPersonaId, req.getNombreEquipo());
+        }
+        if (req != null && req.getEquipoId() != null) {
+            var equipo = equipoRepo.findById(req.getEquipoId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Equipo no encontrado."));
+            if (!equipo.getDelegadoPersonaId().equals(delegadoPersonaId)) {
+                throw ApiException.forbidden("EQUIPO_AJENO", "Ese equipo no es tuyo.");
+            }
+            return equipo;
+        }
+        var propios = equipoRepo.findByDelegadoPersonaIdOrderByCreatedAtDesc(delegadoPersonaId);
+        if (propios.size() == 1) return propios.get(0);
+        throw ApiException.badRequest("EQUIPO_REQUERIDO", propios.isEmpty()
+                ? "Escribe el nombre de tu equipo (nombreEquipo) o crea uno antes de inscribirlo."
+                : "Tienes varios equipos: elige cuál inscribir (equipoId).");
     }
 
     @Transactional(readOnly = true)
@@ -120,35 +161,57 @@ public class DelegadoService {
         }).toList();
     }
 
+    /** Compatibilidad: inscribe su único equipo (o falla con EQUIPO_REQUERIDO si tiene varios). */
     @Transactional
     public InscripcionDTO inscribir(UUID delegadoPersonaId, UUID torneoId) {
+        return inscribir(delegadoPersonaId, torneoId, null);
+    }
+
+    /**
+     * Spec 0026: cualquier cuenta inscribe un equipo en un torneo PUBLICADO, sin rol global. Queda
+     * PENDIENTE_PAGO, con ella como delegado y en el plantel; la aprobación del admin decide.
+     */
+    @Transactional
+    public InscripcionDTO inscribir(UUID delegadoPersonaId, UUID torneoId, InscribirEquipoRequest req) {
         var torneo = torneoRepo.findById(torneoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Torneo no encontrado."));
         if (torneo.getEstado() != EstadoTorneo.PUBLICADO) {
-            throw new RuntimeException("Solo se puede inscribir a torneos PUBLICADOS.");
+            throw ApiException.conflict("INSCRIPCIONES_CERRADAS", "Solo se puede inscribir a torneos con inscripciones abiertas.");
         }
         // Spec 0023: si el torneo exige documento, el delegado (que entra al plantel) debe tenerlo.
         if (Boolean.TRUE.equals(torneo.getExigeDocumento())
                 && directorioPersonas.requerir(delegadoPersonaId).numeroDocumento() == null) {
             throw documentoRequerido("Este torneo exige documento: agrega el tuyo en tu perfil antes de inscribir el equipo.");
         }
-
-        var equipoDto = miEquipo(delegadoPersonaId);
-        var equipo = equipoRepo.findById(equipoDto.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Equipo no encontrado."));
-
         if (equipoTorneoRepo.findByTorneoIdAndDelegadoPersonaId(torneoId, delegadoPersonaId).isPresent()) {
-            throw new RuntimeException("Ya tienes una inscripcion para este torneo.");
+            throw ApiException.conflict("YA_INSCRITO", "Ya tienes una inscripcion para este torneo.");
         }
-        if (equipoTorneoRepo.findByTorneoIdAndEquipoId(torneoId, equipo.getId()).isPresent()) {
-            throw new RuntimeException("El equipo ya esta inscrito en este torneo.");
+        if (jugadorEquipoRepo.existsByPersonaIdAndTorneoIdAndEstado(delegadoPersonaId, torneoId, EstadoMembresia.ACTIVO)) {
+            throw ApiException.conflict("YA_EN_UN_EQUIPO_DEL_TORNEO",
+                    "Ya juegas en un equipo de este torneo: no puedes inscribir otro.");
         }
 
+        var equipo = equipoParaInscribir(delegadoPersonaId, req);
+        if (equipoTorneoRepo.findByTorneoIdAndEquipoId(torneoId, equipo.getId()).isPresent()) {
+            throw ApiException.conflict("YA_INSCRITO", "El equipo ya esta inscrito en este torneo.");
+        }
+        return torneoAdminService.toInscripcionDTO(
+                registrarInscripcion(torneo, equipo, delegadoPersonaId, EstadoInscripcion.PENDIENTE_PAGO));
+    }
+
+    /**
+     * Crea la inscripción y suma al delegado a su plantel. La usan la autoinscripción y el cupo
+     * por invitación (spec 0026, camino b).
+     */
+    @Transactional
+    public EquipoTorneo registrarInscripcion(terminus.co.edu.ufps.codecup.competicion.model.Torneo torneo, Equipo equipo,
+                                             UUID delegadoPersonaId, EstadoInscripcion estado) {
+        UUID torneoId = torneo.getId();
         var et = EquipoTorneo.builder()
                 .torneo(torneo)
                 .equipo(equipo)
                 .delegadoPersonaId(delegadoPersonaId)
-                .estadoInscripcion(EstadoInscripcion.PENDIENTE_PAGO)
+                .estadoInscripcion(estado)
                 .build();
         equipoTorneoRepo.save(et);
 
@@ -173,7 +236,7 @@ public class DelegadoService {
             jugadorEquipoRepo.save(je);
         }
 
-        return torneoAdminService.toInscripcionDTO(et);
+        return et;
     }
 
     @Transactional(readOnly = true)
@@ -289,6 +352,11 @@ public class DelegadoService {
         return numero;
     }
 
+    /** Spec 0026: antes salía como 400 REGLA_NEGOCIO. */
+    public static ApiException noDelegado() {
+        return ApiException.forbidden("NO_DELEGADO_DE_LA_INSCRIPCION", "No eres el delegado de esta inscripción.");
+    }
+
     private static ApiException documentoRequerido(String mensaje) {
         return ApiException.conflict("DOCUMENTO_REQUERIDO", mensaje);
     }
@@ -381,7 +449,7 @@ public class DelegadoService {
         var et = equipoTorneoRepo.findById(equipoTorneoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Inscripcion no encontrada."));
         if (!et.getDelegadoPersonaId().equals(delegadoPersonaId)) {
-            throw new RuntimeException("No eres el delegado de esta inscripcion.");
+            throw noDelegado();
         }
         return et;
     }

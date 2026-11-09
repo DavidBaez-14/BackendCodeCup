@@ -37,6 +37,13 @@ public class MeResponseDTO {
     /** Solicitud de vínculo con una persona con historial, si la cuenta tiene una pendiente (spec 0023). */
     private VinculoPendiente vinculoPendiente;
 
+    /**
+     * Spec 0026: "Tus secciones" (Creador y Árbitro) con lo urgente de cada una. Una sección en null
+     * es una que la cuenta no tiene. Los permisos reales son por torneo; {@link #roles} queda por
+     * compatibilidad con la web.
+     */
+    private terminus.co.edu.ufps.codecup.identidad.api.Secciones secciones;
+
     public record VinculoPendiente(UUID id, UUID personaId, String estado, java.time.LocalDateTime creadoEn) {
     }
 }

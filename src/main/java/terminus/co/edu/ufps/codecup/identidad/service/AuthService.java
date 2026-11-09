@@ -40,6 +40,8 @@ public class AuthService {
     private final RolesCuenta rolesCuenta;
     private final InvitacionService invitacionService;
     private final VinculosPersona vinculosPersona;
+    /** Spec 0026: lo implementa la competición; identidad no depende de ella. */
+    private final org.springframework.beans.factory.ObjectProvider<terminus.co.edu.ufps.codecup.identidad.api.ResumenSecciones> resumenSecciones;
 
     @Transactional(readOnly = true)
     public MeResponseDTO me(String sub) {
@@ -189,7 +191,14 @@ public class AuthService {
                 .vinculoPendiente(vinculosPersona.pendienteDeCuenta(cuenta.getId())
                         .map(v -> new MeResponseDTO.VinculoPendiente(v.id(), v.personaId(), v.estado(), v.creadoEn()))
                         .orElse(null))
+                .secciones(secciones(cuenta))
                 .build();
+    }
+
+    private terminus.co.edu.ufps.codecup.identidad.api.Secciones secciones(Cuenta cuenta) {
+        var resumen = resumenSecciones.getIfAvailable();
+        if (resumen == null) return terminus.co.edu.ufps.codecup.identidad.api.Secciones.NINGUNA;
+        return resumen.de(cuenta.getId(), cuenta.getPersona() != null ? cuenta.getPersona().getId() : null);
     }
 
     private static String trimOrNull(String s) {

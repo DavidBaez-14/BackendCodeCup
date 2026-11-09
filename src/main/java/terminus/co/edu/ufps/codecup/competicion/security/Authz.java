@@ -100,6 +100,18 @@ public class Authz {
         return true;
     }
 
+    /**
+     * Spec 0026: administra o arbitra algún torneo, o es delegado de alguna inscripción. Para
+     * consultas de apoyo que no son de un torneo concreto (la deuda global de una persona).
+     */
+    public boolean gestionaAlgo() {
+        UUID cuenta = cuentaActual();
+        if (!permisos.torneosDondeEsStaff(cuenta).isEmpty() || permisos.esDelegadoDeAlgo(personaActual())) {
+            return true;
+        }
+        throw ApiException.forbidden("ACCESO_DENEGADO", "No tienes permisos para esta acción.");
+    }
+
     /** Administra al menos un torneo (consultas que no son de un torneo concreto). */
     public boolean adminDeAlgunTorneo() {
         if (permisos.torneosQueAdministra(cuentaActual()).isEmpty()) {
@@ -115,6 +127,15 @@ public class Authz {
             throw new AuthenticationCredentialsNotFoundException("Sin sesión");
         }
         return JwtClaims.cuentaId(jwt);
+    }
+
+    /** Persona de quien hace la petición. */
+    public static UUID personaActual() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof Jwt jwt)) {
+            throw new AuthenticationCredentialsNotFoundException("Sin sesión");
+        }
+        return JwtClaims.personaId(jwt);
     }
 
     static ApiException noStaff() {

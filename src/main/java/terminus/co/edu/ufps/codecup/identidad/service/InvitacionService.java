@@ -77,12 +77,21 @@ public class InvitacionService {
     @Transactional
     public InvitacionDTO crearConAmbito(AmbitoInvitacion ambito, UUID ambitoId, String descripcion, Rol rol,
                                         String correo, UUID creadorCuentaId) {
+        return crearConAmbito(ambito, ambitoId, descripcion, rol, correo, null, creadorCuentaId);
+    }
+
+    /** Como el anterior, con el dato extra del ámbito (spec 0026: el nombre del equipo de un cupo). */
+    @Transactional
+    public InvitacionDTO crearConAmbito(AmbitoInvitacion ambito, UUID ambitoId, String descripcion, Rol rol,
+                                        String correo, String datoExtra, UUID creadorCuentaId) {
         if (ambito == null || ambitoId == null) {
             throw new IllegalArgumentException("Una invitación con ámbito necesita el ámbito y su id.");
         }
         var creador = cuentaRepository.findById(creadorCuentaId)
                 .orElseThrow(() -> ApiException.notFound("CUENTA_NO_REGISTRADA", "Cuenta no encontrada."));
-        return toDTO(nueva(Documentos.normalizarCorreo(correo), rol, creador, ambito, ambitoId, descripcion));
+        var inv = nueva(Documentos.normalizarCorreo(correo), rol, creador, ambito, ambitoId, descripcion);
+        inv.setDatoExtra(datoExtra);
+        return toDTO(invitacionRepository.save(inv));
     }
 
     /** Invitación sin creador humano (BootstrapAdmin). */
@@ -182,7 +191,7 @@ public class InvitacionService {
                     inv.getId(), inv.getAmbito(), inv.getAmbitoId(), inv.getRol(), cuenta.getId(),
                     cuenta.getPersona() != null ? cuenta.getPersona().getId() : null,
                     inv.getCreadaPor() != null ? inv.getCreadaPor().getId() : null,
-                    null));
+                    inv.getDatoExtra()));
         }
         inv.setEstado(EstadoInvitacion.ACEPTADA);
         inv.setAceptadaPor(cuenta);
@@ -246,6 +255,7 @@ public class InvitacionService {
                 .ambito(inv.getAmbito() != null ? inv.getAmbito().name() : null)
                 .ambitoId(inv.getAmbitoId())
                 .ambitoDescripcion(inv.getAmbitoDescripcion())
+                .datoExtra(inv.getDatoExtra())
                 .estado(inv.getEstado().name())
                 .token(inv.getToken())
                 .enlace(frontendUrl + "/invitacion/" + inv.getToken())

@@ -105,7 +105,7 @@ public class MultaController {
     }
 
     @GetMapping("/elegibilidad/{personaId}")
-    @PreAuthorize("hasRole('DELEGADO') or hasAuthority('SCOPE_internal') or @authz.staffDeAlgunTorneo()")
+    @PreAuthorize("hasAuthority('SCOPE_internal') or @authz.gestionaAlgo()")
     public ResponseEntity<Boolean> elegible(@PathVariable UUID personaId) {
         return ResponseEntity.ok(!multaService.jugadorTieneDeudas(personaId));
     }

@@ -180,7 +180,10 @@ public final class SeedService {
             EquipoPrueba ep = equipos.get(i);
             UsuarioPrueba delegado = porAlias.get(ep.aliasDelegado());
             UUID delegadoId = personaDe(delegado);
-            Equipo equipo = repos.equipos().findByDelegadoPersonaId(delegadoId)
+            // Spec 0026: un delegado puede tener varios equipos; el del seed se busca por nombre.
+            Equipo equipo = repos.equipos().findByDelegadoPersonaIdOrderByCreatedAtDesc(delegadoId).stream()
+                    .filter(e -> ep.nombre().equals(e.getNombre()))
+                    .findFirst()
                     .orElseGet(() -> repos.equipos().save(Equipo.builder()
                             .nombre(ep.nombre())
                             .delegadoPersonaId(delegadoId)

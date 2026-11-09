@@ -174,8 +174,9 @@ class AuthFlowSecurityTest extends AuthTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.estado").value("PENDIENTE"))
                 .andExpect(jsonPath("$.mensaje").isNotEmpty());
+        // Spec 0026: los endpoints del delegado ya no piden el rol global (antes, 403).
         mvc.perform(get("/api/supercopa/delegado/torneos/disponibles").header("Authorization", jugador.bearer()))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk());
 
         var admin = cuentaConRoles(Rol.ADMINISTRADOR, Rol.JUGADOR);
         String pendientes = mvc.perform(get("/api/admin/roles/pendientes").header("Authorization", admin.bearer()))

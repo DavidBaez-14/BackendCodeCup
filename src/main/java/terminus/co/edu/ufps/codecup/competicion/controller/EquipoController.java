@@ -21,7 +21,7 @@ public class EquipoController {
     private final EquipoRepository equipoRepository;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('JUGADOR','DELEGADO','ADMINISTRADOR')")
+    @PreAuthorize("@authz.registrado()")
     public ResponseEntity<List<EquipoDTO>> listar() {
         var equipos = equipoRepository.findAll()
                 .stream()
